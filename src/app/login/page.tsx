@@ -4,12 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { useAuth } from "@/context/AuthContext";
+import { authClient } from "@/lib/auth-client";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,10 +24,19 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 1000));
-    login(email);
+    const { error: signInError } = await authClient.signIn.email({
+      email,
+      password,
+    });
     setLoading(false);
+
+    if (signInError) {
+      setError(signInError.message || "Invalid email or password.");
+      return;
+    }
+
     router.push("/dashboard");
+    router.refresh();
   };
 
   return (
