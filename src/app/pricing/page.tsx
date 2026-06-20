@@ -162,11 +162,11 @@ export default function PricingPage() {
                   <span className={styles.pricePer}>/ mo</span>
                 )}
               </div>
-              {yearly && plan.price.monthly > 0 && (
-                <p className={styles.priceBilled}>
-                  Billed annually (${plan.price.yearly * 12}/yr)
-                </p>
-              )}
+              <p className={styles.priceBilled}>
+                {yearly && plan.price.monthly > 0
+                  ? `Billed annually ($${plan.price.yearly * 12}/yr)`
+                  : "\u00A0"}
+              </p>
 
               <Link
                 href={plan.ctaHref}

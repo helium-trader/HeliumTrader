@@ -5,13 +5,13 @@
 .dashboardLayout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   padding-top: var(--nav-height);
-  overflow: hidden;
+  padding-bottom: 40px;
 }
 
 .dashboardHeader {
-  padding: 20px 24px 0;
+  padding: 24px 24px 0;
   max-width: var(--content-max-width);
   width: 100%;
   margin: 0 auto;
@@ -95,11 +95,11 @@
 .statsBar {
   display: flex;
   gap: 1px;
-  padding: 0 24px 16px;
+  margin: 20px auto 24px;
   max-width: var(--content-max-width);
-  width: 100%;
-  margin: 0 auto;
+  width: calc(100% - 48px);
   background: var(--border-primary);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -154,13 +154,11 @@
   display: grid;
   grid-template-columns: 3fr 1fr;
   gap: 12px;
-  padding: 0 24px 16px;
+  padding: 0 24px;
   max-width: var(--content-max-width);
   width: 100%;
   margin: 0 auto;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  align-items: start;
 }
 
 /* ── Chart Column ── */
@@ -169,9 +167,6 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 .chartPanel {
@@ -232,8 +227,7 @@
 }
 
 .chartBody {
-  height: calc(100vh - var(--nav-height) - 160px);
-  min-height: 480px;
+  height: clamp(460px, 62vh, 640px);
   overflow: hidden;
   position: relative;
 }
