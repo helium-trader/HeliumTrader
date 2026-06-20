@@ -806,9 +806,9 @@ export default function DashboardPage() {
               <div className={styles.sidebarContent}>
                 <CryptoTab
                   activeSymbol={tvSymbol}
-                  onSelect={(sym, label) => {
-                    setTvSymbol(sym);
-                    setPairLabel(label);
+                  onSelect={(coin) => {
+                    setTvSymbol(coin.symbol);
+                    setPairLabel(coin.name);
                   }}
                 />
 

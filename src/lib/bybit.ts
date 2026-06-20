@@ -1,6 +1,10 @@
 // Bybit v5 public market data helpers.
 // Docs: https://bybit-exchange.github.io/docs/v5/market/tickers
 // All endpoints used here are public (no API key required).
+//
+// NOTE: Bybit's REST API is geo-blocked from many server regions (incl. US
+// Vercel) via CloudFront. These helpers are therefore called directly from the
+// browser so requests originate from the end user's own location.
 
 export const BYBIT_BASE = "https://api.bybit.com";
 
@@ -49,14 +53,13 @@ export const INTERVAL_MAP: Record<string, string> = {
 
 async function bybitFetch(
   path: string,
-  params: Record<string, string>,
-  revalidate = 0
+  params: Record<string, string>
 ): Promise<unknown> {
   const url = new URL(`${BYBIT_BASE}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const res = await fetch(url.toString(), {
     headers: { accept: "application/json" },
-    ...(revalidate > 0 ? { next: { revalidate } } : { cache: "no-store" }),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`Bybit ${path} ${res.status}`);
   const json = (await res.json()) as { retCode: number; retMsg: string; result?: unknown };
@@ -91,13 +94,11 @@ export function mapTicker(t: BybitTicker): CryptoMarket {
   };
 }
 
-// Fetch all spot tickers (single request, no key). Cached briefly upstream.
-export async function fetchSpotTickers(revalidate = 30): Promise<CryptoMarket[]> {
-  const result = (await bybitFetch(
-    "/v5/market/tickers",
-    { category: "spot" },
-    revalidate
-  )) as { list?: BybitTicker[] };
+// Fetch all spot tickers (single request, no key).
+export async function fetchSpotTickers(): Promise<CryptoMarket[]> {
+  const result = (await bybitFetch("/v5/market/tickers", {
+    category: "spot",
+  })) as { list?: BybitTicker[] };
   const list = result?.list ?? [];
   return list
     .map(mapTicker)
@@ -120,16 +121,12 @@ export async function fetchKlines(
   interval: string,
   limit = 200
 ): Promise<BybitKline[]> {
-  const result = (await bybitFetch(
-    "/v5/market/kline",
-    {
-      category: "spot",
-      symbol,
-      interval: INTERVAL_MAP[interval] ?? "60",
-      limit: String(Math.min(Math.max(limit, 1), 1000)),
-    },
-    30
-  )) as { list?: string[][] };
+  const result = (await bybitFetch("/v5/market/kline", {
+    category: "spot",
+    symbol,
+    interval: INTERVAL_MAP[interval] ?? "60",
+    limit: String(Math.min(Math.max(limit, 1), 1000)),
+  })) as { list?: string[][] };
   const list = result?.list ?? [];
   // Bybit returns newest-first: [startTime, open, high, low, close, volume, turnover]
   return list

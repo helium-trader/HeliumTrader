@@ -14,10 +14,10 @@ const publicLinks = [
 
 const authLinks = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/paper", label: "Paper Trading" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/reports", label: "Reports" },
   { href: "/education", label: "Education" },
-  { href: "/pricing", label: "Pricing" },
 ];
 
 export default function Navbar() {

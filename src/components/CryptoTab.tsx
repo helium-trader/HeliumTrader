@@ -2,18 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
+import { fetchSpotTickers, type CryptoMarket } from "@/lib/bybit";
 import styles from "./CryptoTab.module.css";
 
-export interface CryptoResult {
-  symbol: string; // Bybit symbol, e.g. "BTCUSDT"
-  base: string; // base asset, e.g. "BTC"
-  quote: string; // quote asset, e.g. "USDT"
-  name: string; // "BTC / USDT"
-  tvSymbol: string; // "BYBIT:BTCUSDT"
-  price: number;
-  change: number;
-  volume?: number;
-}
+export type CryptoResult = CryptoMarket;
 
 interface CryptoTabProps {
   activeSymbol: string;
@@ -23,16 +15,10 @@ interface CryptoTabProps {
 const WATCHLIST_KEY = "helium_watchlist_bybit";
 
 const defaultWatchlist: CryptoResult[] = [
-  { symbol: "BTCUSDT", base: "BTC", quote: "USDT", name: "BTC / USDT", tvSymbol: "BYBIT:BTCUSDT", price: 0, change: 0 },
-  { symbol: "ETHUSDT", base: "ETH", quote: "USDT", name: "ETH / USDT", tvSymbol: "BYBIT:ETHUSDT", price: 0, change: 0 },
-  { symbol: "SOLUSDT", base: "SOL", quote: "USDT", name: "SOL / USDT", tvSymbol: "BYBIT:SOLUSDT", price: 0, change: 0 },
+  { symbol: "BTCUSDT", base: "BTC", quote: "USDT", name: "BTC / USDT", tvSymbol: "BYBIT:BTCUSDT", price: 0, change: 0, volume: 0 },
+  { symbol: "ETHUSDT", base: "ETH", quote: "USDT", name: "ETH / USDT", tvSymbol: "BYBIT:ETHUSDT", price: 0, change: 0, volume: 0 },
+  { symbol: "SOLUSDT", base: "SOL", quote: "USDT", name: "SOL / USDT", tvSymbol: "BYBIT:SOLUSDT", price: 0, change: 0, volume: 0 },
 ];
-
-const fetcher = async (url: string) => {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`request failed: ${r.status}`);
-  return r.json();
-};
 
 function formatPrice(p: number) {
   if (p === 0) return "—";
@@ -74,23 +60,44 @@ export default function CryptoTab({ activeSymbol, onSelect }: CryptoTabProps) {
     return () => clearTimeout(t);
   }, [query]);
 
-  const { data, isLoading, error } = useSWR<{ results: CryptoResult[] }>(
-    `/api/crypto${debounced ? `?q=${encodeURIComponent(debounced)}` : ""}`,
-    fetcher,
+  // Load all Bybit spot markets directly from the browser (Bybit is geo-blocked
+  // server-side), refreshing every 20s. Search/sort happens locally.
+  const { data, isLoading, error } = useSWR<CryptoResult[]>(
+    "bybit-spot-tickers",
+    () => fetchSpotTickers(),
     {
+      refreshInterval: 20000,
       revalidateOnFocus: false,
-      dedupingInterval: 60000,
+      dedupingInterval: 15000,
       keepPreviousData: true,
       errorRetryCount: 4,
       errorRetryInterval: 1500,
     }
   );
 
-  const results = data?.results ?? [];
+  const results = useMemo(() => {
+    const all = [...(data ?? [])].sort((a, b) => b.volume - a.volume);
+    const q = debounced.toLowerCase();
+    if (!q) return all.slice(0, 50);
+    return all
+      .filter(
+        (m) =>
+          m.base.toLowerCase().includes(q) ||
+          m.symbol.toLowerCase().includes(q) ||
+          m.name.toLowerCase().includes(q)
+      )
+      .slice(0, 30);
+  }, [data, debounced]);
   const watchSymbols = useMemo(
     () => new Set(watchlist.map((w) => w.tvSymbol)),
     [watchlist]
   );
+
+  // Merge live prices into the saved watchlist for display.
+  const watchlistLive = useMemo(() => {
+    const bySymbol = new Map((data ?? []).map((m) => [m.symbol, m]));
+    return watchlist.map((w) => bySymbol.get(w.symbol) ?? w);
+  }, [watchlist, data]);
 
   const toggleWatch = (coin: CryptoResult) => {
     setWatchlist((prev) =>
@@ -176,7 +183,7 @@ export default function CryptoTab({ activeSymbol, onSelect }: CryptoTabProps) {
         <div className={styles.section}>
           <span className={styles.sectionLabel}>Watchlist · {watchlist.length}</span>
           <div className={styles.list}>
-            {watchlist.map((coin) => renderRow(coin, true))}
+            {watchlistLive.map((coin) => renderRow(coin, true))}
           </div>
         </div>
       )}
