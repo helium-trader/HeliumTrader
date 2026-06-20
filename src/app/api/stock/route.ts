@@ -7,7 +7,7 @@ export const revalidate = 300;
 
 // OHLCV candle returned to the client.
 export interface StockData {
-  time: string; // ISO date, e.g. "2026-06-20"
+  time: string; // ISO date "2026-06-20" (daily/weekly) or full ISO timestamp (intraday)
   open: number;
   high: number;
   low: number;
@@ -20,8 +20,18 @@ type Period = "1mo" | "3mo" | "6mo" | "1y" | "2y" | "5y";
 const ALLOWED_PERIODS: Period[] = ["1mo", "3mo", "6mo", "1y", "2y", "5y"];
 
 // Choose a candle interval that keeps the dataset reasonable for each range.
-function intervalFor(period: Period): "1d" | "1wk" {
+// Short ranges use an hourly interval so there are enough candles for
+// strategy indicators to warm up and produce completed trades — a daily
+// interval over 1 month is only ~21 candles, too few for most indicators.
+function intervalFor(period: Period): "1h" | "1d" | "1wk" {
+  if (period === "1mo" || period === "3mo") return "1h";
   return period === "2y" || period === "5y" ? "1wk" : "1d";
+}
+
+// Intraday intervals need the full timestamp so candles on the same day stay
+// distinct; daily/weekly intervals only need the date.
+function isIntraday(interval: string): boolean {
+  return interval.endsWith("h") || interval.endsWith("m");
 }
 
 function startDateFor(period: Period): Date {
@@ -63,6 +73,7 @@ export async function GET(request: Request) {
   try {
     const interval = intervalFor(period);
     const period1 = startDateFor(period);
+    const intraday = isIntraday(interval);
 
     const result = await yahooFinance.chart(symbol, {
       period1,
@@ -80,7 +91,9 @@ export async function GET(request: Request) {
           q.close != null
       )
       .map((q) => ({
-        time: new Date(q.date as Date).toISOString().slice(0, 10),
+        time: intraday
+          ? new Date(q.date as Date).toISOString()
+          : new Date(q.date as Date).toISOString().slice(0, 10),
         open: Number((q.open as number).toFixed(2)),
         high: Number((q.high as number).toFixed(2)),
         low: Number((q.low as number).toFixed(2)),
