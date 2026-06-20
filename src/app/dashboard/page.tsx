@@ -9,6 +9,7 @@ import styles from "./dashboard.module.css";
 // --- Types ---
 type Strategy = "sma_crossover" | "rsi" | "bollinger" | "macd";
 type Mode = "simulate" | "paper";
+type SidebarTab = "params" | "crypto";
 
 interface StrategyParams {
   sma_crossover: { fastPeriod: number; slowPeriod: number; stopLoss: number; takeProfit: number };
@@ -25,6 +26,14 @@ interface Trade {
   pnl: string;
   profit: boolean;
   price: string;
+}
+
+interface CryptoAsset {
+  symbol: string;
+  name: string;
+  tvSymbol: string;
+  price: number;
+  change: number;
 }
 
 const strategyLabels: Record<Strategy, string> = {
@@ -50,23 +59,17 @@ const defaultParams: StrategyParams = {
 
 const timeframes = ["1m", "5m", "15m", "1H", "4H", "1D"];
 
-// Generate mock candlestick data
-function generateCandles(count: number, seed = 3.8) {
-  const candles = [];
-  let price = seed * 26;
-  for (let i = 0; i < count; i++) {
-    const change = (Math.random() - 0.47) * 1.8;
-    const open = price;
-    const close = Math.max(price + change, 60);
-    const high = Math.max(open, close) + Math.random() * 1.2;
-    const low = Math.min(open, close) - Math.random() * 1.2;
-    candles.push({ open, close, high, low, green: close >= open });
-    price = close;
-  }
-  return candles;
-}
+const cryptoAssets: CryptoAsset[] = [
+  { symbol: "SUI", name: "Sui", tvSymbol: "BINANCE:SUIUSDT", price: 3.847, change: 2.14 },
+  { symbol: "BTC", name: "Bitcoin", tvSymbol: "BINANCE:BTCUSDT", price: 67420.5, change: 1.32 },
+  { symbol: "ETH", name: "Ethereum", tvSymbol: "BINANCE:ETHUSDT", price: 3521.8, change: -0.87 },
+  { symbol: "SOL", name: "Solana", tvSymbol: "BINANCE:SOLUSDT", price: 178.4, change: 3.56 },
+  { symbol: "BNB", name: "BNB", tvSymbol: "BINANCE:BNBUSDT", price: 596.2, change: 0.43 },
+  { symbol: "AVAX", name: "Avalanche", tvSymbol: "BINANCE:AVAXUSDT", price: 38.91, change: -1.22 },
+  { symbol: "DOGE", name: "Dogecoin", tvSymbol: "BINANCE:DOGEUSDT", price: 0.1612, change: 4.87 },
+  { symbol: "ARB", name: "Arbitrum", tvSymbol: "BINANCE:ARBUSDT", price: 1.043, change: -2.41 },
+];
 
-// Generate equity curve
 function generateEquityCurve(length: number, winRate: number) {
   const points = [10000];
   for (let i = 1; i < length; i++) {
@@ -105,11 +108,10 @@ export default function DashboardPage() {
   const [winRate, setWinRate] = useState(64.3);
   const [totalTrades, setTotalTrades] = useState(127);
   const [sharpe, setSharpe] = useState(1.84);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("params");
   const tradeIdRef = useRef(200);
   const historyRef = useRef<HTMLDivElement>(null);
 
-  // candles kept for potential future use
-  const candles = useMemo(() => generateCandles(60, livePrice), [activeTimeframe, strategy]);
   const equityCurve = useMemo(() => generateEquityCurve(40, winRate / 100), [simDone, strategy]);
 
   // Live price ticker
@@ -147,7 +149,6 @@ export default function DashboardPage() {
       step++;
       setProgress(Math.round((step / totalSteps) * 100));
 
-      // Occasionally emit a trade
       if (step % 3 === 0) {
         const isProfit = Math.random() < winRate / 100;
         const newTrade: Trade = {
@@ -160,8 +161,6 @@ export default function DashboardPage() {
           price: `$${(livePrice + (Math.random() - 0.5) * 0.2).toFixed(3)}`,
         };
         setTrades((prev) => [newTrade, ...prev].slice(0, 12));
-
-        // Update stats
         setTotalTrades((t) => t + 1);
         setPortfolio((p) => {
           const delta = isProfit
@@ -203,14 +202,6 @@ export default function DashboardPage() {
 
   const currentParams = params[strategy];
 
-  // Chart scaling
-  const allPrices = candles.flatMap((c) => [c.high, c.low]);
-  const minPrice = Math.min(...allPrices);
-  const maxPrice = Math.max(...allPrices);
-  const priceRange = maxPrice - minPrice || 1;
-  const chartHeight = 340;
-  const scaleY = (price: number) => ((price - minPrice) / priceRange) * chartHeight;
-
   // Equity curve SVG path
   const eqMin = Math.min(...equityCurve);
   const eqMax = Math.max(...equityCurve);
@@ -226,21 +217,21 @@ export default function DashboardPage() {
   const portfolioChange = ((portfolio - 10000) / 10000 * 100).toFixed(2);
   const portfolioUp = portfolio >= 10000;
 
-  // Auto-scroll trade history
   useEffect(() => {
-    if (historyRef.current) {
-      historyRef.current.scrollTop = 0;
-    }
+    if (historyRef.current) historyRef.current.scrollTop = 0;
   }, [trades.length]);
+
+  const selectedAsset = cryptoAssets.find((a) => a.tvSymbol === tvSymbol);
 
   return (
     <>
       <Navbar />
       <div className={styles.dashboardLayout}>
+        {/* Header */}
         <div className={styles.dashboardHeader}>
           <div className={styles.dashboardTitleRow}>
             <div className={styles.titleGroup}>
-              <h1 className={styles.dashboardTitle}>Trading Dashboard</h1>
+              <h1 className={styles.dashboardTitle}>Dashboard</h1>
               <span className={styles.liveDot} aria-label="Live data">
                 <span className={styles.livePulse} />
                 Live
@@ -263,72 +254,56 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className={styles.dashboardGrid}>
-          {/* Stats Bar */}
-          <div className={styles.statsBar}>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Portfolio Value</span>
-              <span className={`${styles.statValue} ${portfolioUp ? "profit" : "loss"}`}>
-                ${portfolio.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className={`${styles.statChange} ${portfolioUp ? "profit" : "loss"}`}>
-                {portfolioUp ? "+" : ""}{portfolioChange}%
-              </span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Win Rate</span>
-              <span className={`${styles.statValue} profit`}>{winRate}%</span>
-              <div className={styles.miniBar}>
-                <div
-                  className={styles.miniBarFill}
-                  style={{ width: `${winRate}%` }}
-                />
-              </div>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Total Trades</span>
-              <span className={styles.statValue}>{totalTrades}</span>
-              <span className={styles.statChange} style={{ color: "var(--text-tertiary)" }}>
-                Last 7 days
-              </span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Sharpe Ratio</span>
-              <span className={`${styles.statValue} profit`}>{sharpe}</span>
-              <span className={`${styles.statChange} ${sharpe >= 1.5 ? "profit" : "loss"}`}>
-                {sharpe >= 2 ? "Excellent" : sharpe >= 1.5 ? "Good" : "Fair"}
-              </span>
+        {/* Stats Bar */}
+        <div className={styles.statsBar}>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Portfolio</span>
+            <span className={`${styles.statValue} ${portfolioUp ? "profit" : "loss"}`}>
+              ${portfolio.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className={`${styles.statChange} ${portfolioUp ? "profit" : "loss"}`}>
+              {portfolioUp ? "+" : ""}{portfolioChange}%
+            </span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Win Rate</span>
+            <span className={`${styles.statValue} profit`}>{winRate}%</span>
+            <div className={styles.miniBar}>
+              <div className={styles.miniBarFill} style={{ width: `${winRate}%` }} />
             </div>
           </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Total Trades</span>
+            <span className={styles.statValue}>{totalTrades}</span>
+            <span className={styles.statChange} style={{ color: "var(--text-tertiary)" }}>Last 7 days</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Sharpe Ratio</span>
+            <span className={`${styles.statValue} profit`}>{sharpe}</span>
+            <span className={`${styles.statChange} ${sharpe >= 1.5 ? "profit" : "loss"}`}>
+              {sharpe >= 2 ? "Excellent" : sharpe >= 1.5 ? "Good" : "Fair"}
+            </span>
+          </div>
+        </div>
 
-          {/* Chart Area */}
-          <div className={styles.chartArea}>
+        {/* Main Content: chart 75% + sidebar 25% */}
+        <div className={styles.mainContent}>
+
+          {/* Chart Column */}
+          <div className={styles.chartColumn}>
             <div className={styles.chartPanel}>
               <div className={styles.chartHeader}>
                 <div className={styles.chartPair}>
-                  <select
-                    className={styles.symbolSelect}
-                    value={tvSymbol}
-                    onChange={(e) => setTvSymbol(e.target.value)}
-                    aria-label="Select trading pair"
-                  >
-                    <option value="BINANCE:SUIUSDT">SUI / USDT</option>
-                    <option value="BINANCE:BTCUSDT">BTC / USDT</option>
-                    <option value="BINANCE:ETHUSDT">ETH / USDT</option>
-                    <option value="BINANCE:SOLUSDT">SOL / USDT</option>
-                    <option value="BINANCE:BNBUSDT">BNB / USDT</option>
-                    <option value="BINANCE:AVAXUSDT">AVAX / USDT</option>
-                  </select>
                   <span
                     className={`${styles.chartPairPrice} ${
                       priceDir === "up" ? styles.priceUp : priceDir === "down" ? styles.priceDown : ""
                     }`}
                   >
+                    {selectedAsset?.symbol ?? "SUI"} / USDT &nbsp;
                     ${livePrice.toFixed(3)}
                   </span>
                   <span className={`badge ${priceDir === "down" ? "badge-loss" : "badge-profit"}`}>
-                    {priceDir === "down" ? "-" : "+"}
-                    {(Math.abs(0.15 + 0.01)).toFixed(2)}%
+                    {priceDir === "down" ? "-" : "+"}0.16%
                   </span>
                 </div>
                 <div className={styles.chartTimeframes}>
@@ -354,12 +329,12 @@ export default function DashboardPage() {
                     activeTimeframe === "4H" ? "240" : "D"
                   }
                   theme="dark"
-                  height={380}
+                  height={420}
                 />
               </div>
             </div>
 
-            {/* Equity Curve Panel */}
+            {/* Equity Curve */}
             {(simDone || trades.length > 0) && (
               <div className={styles.equityPanel}>
                 <div className={styles.equityHeader}>
@@ -369,43 +344,79 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className={styles.equityBody}>
-                  <svg
-                    viewBox={`0 0 ${eqW} ${eqH}`}
-                    preserveAspectRatio="none"
-                    className={styles.equitySvg}
-                    aria-hidden="true"
-                  >
+                  <svg viewBox={`0 0 ${eqW} ${eqH}`} preserveAspectRatio="none" className={styles.equitySvg} aria-hidden="true">
                     <defs>
                       <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={portfolioUp ? "#10b981" : "#ef4444"} stopOpacity="0.3" />
-                        <stop offset="100%" stopColor={portfolioUp ? "#10b981" : "#ef4444"} stopOpacity="0" />
+                        <stop offset="0%" stopColor={portfolioUp ? "#22c55e" : "#ef4444"} stopOpacity="0.25" />
+                        <stop offset="100%" stopColor={portfolioUp ? "#22c55e" : "#ef4444"} stopOpacity="0" />
                       </linearGradient>
                     </defs>
-                    <path
-                      d={`${eqPath} L${eqW},${eqH} L0,${eqH} Z`}
-                      fill="url(#eq-grad)"
-                    />
-                    <path
-                      d={eqPath}
-                      fill="none"
-                      stroke={portfolioUp ? "#10b981" : "#ef4444"}
-                      strokeWidth="1.5"
-                    />
+                    <path d={`${eqPath} L${eqW},${eqH} L0,${eqH} Z`} fill="url(#eq-grad)" />
+                    <path d={eqPath} fill="none" stroke={portfolioUp ? "#22c55e" : "#ef4444"} strokeWidth="1.5" />
                   </svg>
                 </div>
               </div>
             )}
+
+            {/* Recent Trades */}
+            <div className={styles.historyPanel}>
+              <div className={styles.historyHeader}>
+                <span className={styles.historyTitle}>Recent Trades</span>
+                {trades.length > 0 && <span className="badge badge-accent">{trades.length}</span>}
+              </div>
+              <div className={styles.historyBody} ref={historyRef}>
+                {trades.length > 0 ? (
+                  trades.map((trade) => (
+                    <div className={`${styles.tradeRow} ${styles.tradeRowNew}`} key={trade.id}>
+                      <div className={styles.tradeInfo}>
+                        <span
+                          className={styles.tradeType}
+                          style={{ color: trade.type === "BUY" ? "var(--color-profit)" : "var(--color-loss)" }}
+                        >
+                          {trade.type} {trade.pair}
+                        </span>
+                        <span className={styles.tradeTime}>{trade.time} · {trade.price}</span>
+                      </div>
+                      <span className={styles.tradePnl} style={{ color: trade.profit ? "var(--color-profit)" : "var(--color-loss)" }}>
+                        {trade.pnl}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.emptyState}>
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                      <circle cx="14" cy="14" r="12" stroke="var(--border-hover)" strokeWidth="1.5" />
+                      <path d="M10 14L13 17L18 11" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p>{mode === "simulate" ? "Run a simulation to see trades" : "Connect wallet to start paper trading"}</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar — 25% */}
           <div className={styles.sidebar}>
-            {/* Parameter Panel */}
-            <div className={styles.paramPanel}>
-              <div className={styles.paramHeader}>
-                <span className={styles.paramTitle}>Strategy Parameters</span>
-                <span className="badge badge-accent">{strategyLabels[strategy]}</span>
-              </div>
-              <div className={styles.paramBody}>
+            {/* Tab Bar */}
+            <div className={styles.sidebarTabs}>
+              <button
+                className={`${styles.sidebarTab} ${sidebarTab === "params" ? styles.sidebarTabActive : ""}`}
+                onClick={() => setSidebarTab("params")}
+              >
+                Parameters
+              </button>
+              <button
+                className={`${styles.sidebarTab} ${sidebarTab === "crypto" ? styles.sidebarTabActive : ""}`}
+                onClick={() => setSidebarTab("crypto")}
+              >
+                Crypto
+              </button>
+            </div>
+
+            {/* Parameters Tab */}
+            {sidebarTab === "params" && (
+              <div className={styles.sidebarContent}>
+                {/* Strategy selector */}
                 <div className={styles.paramGroup}>
                   <label className={styles.paramLabel}>Strategy</label>
                   <select
@@ -424,6 +435,9 @@ export default function DashboardPage() {
                   <p className={styles.strategyDesc}>{strategyDescriptions[strategy]}</p>
                 </div>
 
+                <div className={styles.paramDivider} />
+
+                {/* Strategy-specific params */}
                 {strategy === "sma_crossover" && (
                   <>
                     <div className={styles.paramGroup}>
@@ -486,7 +500,7 @@ export default function DashboardPage() {
                     </div>
                     <div className={styles.paramGroup}>
                       <label className={styles.paramLabel}>
-                        Std Deviation <span className={styles.paramValue}>{(currentParams as typeof defaultParams.bollinger).stdDev}</span>
+                        Std Dev <span className={styles.paramValue}>{(currentParams as typeof defaultParams.bollinger).stdDev}</span>
                       </label>
                       <input type="range" className="slider" min="1" max="4" step="0.5"
                         value={(currentParams as typeof defaultParams.bollinger).stdDev}
@@ -524,6 +538,8 @@ export default function DashboardPage() {
                   </>
                 )}
 
+                <div className={styles.paramDivider} />
+
                 <div className={styles.paramGroup}>
                   <label className={styles.paramLabel}>
                     Stop Loss <span className={styles.paramValue} style={{ color: "var(--color-loss)" }}>{currentParams.stopLoss}%</span>
@@ -540,114 +556,87 @@ export default function DashboardPage() {
                     value={currentParams.takeProfit}
                     onChange={(e) => updateParam("takeProfit", +e.target.value)} />
                 </div>
-              </div>
 
-              {running && (
-                <div className={styles.progressBar}>
-                  <div className={styles.progressLabel}>
-                    <span>Running simulation...</span>
-                    <span className={styles.progressPct}>{progress}%</span>
+                {running && (
+                  <div className={styles.progressGroup}>
+                    <div className={styles.progressLabel}>
+                      <span>Running simulation...</span>
+                      <span className={styles.progressPct}>{progress}%</span>
+                    </div>
+                    <div className={styles.progressTrack}>
+                      <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+                    </div>
                   </div>
-                  <div className={styles.progressTrack}>
-                    <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-                  </div>
-                </div>
-              )}
-
-              {simDone && (
-                <div className={styles.simResult}>
-                  Simulation complete — {trades.length} signals generated
-                </div>
-              )}
-
-              <div className={styles.paramActions}>
-                <button
-                  className={`btn btn-primary ${running ? styles.btnRunning : ""}`}
-                  style={{ width: "100%" }}
-                  onClick={mode === "simulate" ? runSimulation : undefined}
-                  disabled={running}
-                >
-                  {running
-                    ? "Running..."
-                    : mode === "simulate"
-                    ? "Run Simulation"
-                    : "Start Paper Trading"}
-                </button>
-                <button className="btn btn-secondary" style={{ width: "100%" }} onClick={resetParams}>
-                  Reset Parameters
-                </button>
-              </div>
-            </div>
-
-            {/* Trade History */}
-            <div className={styles.historyPanel}>
-              <div className={styles.historyHeader}>
-                <span className={styles.historyTitle}>Recent Trades</span>
-                {trades.length > 0 && (
-                  <span className="badge badge-accent">{trades.length}</span>
                 )}
+
+                {simDone && (
+                  <div className={styles.simResult}>
+                    Simulation complete — {trades.length} signals generated
+                  </div>
+                )}
+
+                <div className={styles.paramActions}>
+                  <button
+                    className={`btn btn-primary ${running ? styles.btnRunning : ""}`}
+                    style={{ width: "100%" }}
+                    onClick={mode === "simulate" ? runSimulation : undefined}
+                    disabled={running}
+                  >
+                    {running ? "Running..." : mode === "simulate" ? "Run Simulation" : "Start Paper Trading"}
+                  </button>
+                  <button className="btn btn-secondary" style={{ width: "100%" }} onClick={resetParams}>
+                    Reset
+                  </button>
+                </div>
               </div>
-              <div className={styles.historyBody} ref={historyRef}>
-                {trades.length > 0 ? (
-                  trades.map((trade) => (
-                    <div className={`${styles.tradeRow} ${styles.tradeRowNew}`} key={trade.id}>
-                      <div className={styles.tradeInfo}>
-                        <span
-                          className={styles.tradeType}
-                          style={{ color: trade.type === "BUY" ? "var(--color-profit)" : "var(--color-loss)" }}
-                        >
-                          {trade.type} {trade.pair}
-                        </span>
-                        <span className={styles.tradeTime}>{trade.time} · {trade.price}</span>
+            )}
+
+            {/* Crypto Tab */}
+            {sidebarTab === "crypto" && (
+              <div className={styles.sidebarContent}>
+                <p className={styles.cryptoHint}>Select a pair to load it in the chart.</p>
+                <div className={styles.cryptoList}>
+                  {cryptoAssets.map((asset) => (
+                    <button
+                      key={asset.symbol}
+                      className={`${styles.cryptoRow} ${tvSymbol === asset.tvSymbol ? styles.cryptoRowActive : ""}`}
+                      onClick={() => setTvSymbol(asset.tvSymbol)}
+                    >
+                      <div className={styles.cryptoRowLeft}>
+                        <span className={styles.cryptoSymbol}>{asset.symbol}</span>
+                        <span className={styles.cryptoName}>{asset.name}</span>
                       </div>
-                      <span
-                        className={styles.tradePnl}
-                        style={{ color: trade.profit ? "var(--color-profit)" : "var(--color-loss)" }}
-                      >
-                        {trade.pnl}
-                      </span>
-                    </div>
-                  ))
-                ) : mode === "simulate" ? (
-                  <div className={styles.emptyState}>
-                    <div className={styles.emptyStateIcon}>
-                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                        <circle cx="16" cy="16" r="14" stroke="var(--border-hover)" strokeWidth="1.5" />
-                        <path d="M11 16L15 20L21 12" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                    <p>Run a simulation to see trades</p>
-                  </div>
-                ) : (
-                  <div className={styles.emptyState}>
-                    <div className={styles.emptyStateIcon}>
-                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                        <circle cx="16" cy="16" r="14" stroke="var(--border-hover)" strokeWidth="1.5" />
-                        <path d="M16 10V16L20 18" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <p>Connect wallet to start paper trading</p>
-                  </div>
-                )}
-              </div>
-            </div>
+                      <div className={styles.cryptoRowRight}>
+                        <span className={styles.cryptoPrice}>
+                          ${asset.price < 1 ? asset.price.toFixed(4) : asset.price.toLocaleString()}
+                        </span>
+                        <span className={`${styles.cryptoChange} ${asset.change >= 0 ? "profit" : "loss"}`}>
+                          {asset.change >= 0 ? "+" : ""}{asset.change}%
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
 
-            {/* Quick Links */}
-            <div className={styles.quickLinks}>
-              <Link href="/simulate" className={styles.quickLink}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8L7 12L13 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Run Full Backtest
-              </Link>
-              <Link href="/reports" className={styles.quickLink}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="3" y="2" width="10" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M6 6H10M6 9H10M6 12H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                View AI Report
-              </Link>
-            </div>
+                <div className={styles.paramDivider} />
+
+                <div className={styles.quickLinks}>
+                  <Link href="/simulate" className={styles.quickLink}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <path d="M2 9L5 6L8 8L12 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Full Backtest
+                  </Link>
+                  <Link href="/reports" className={styles.quickLink}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M5 5H9M5 8H9M5 11H7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    </svg>
+                    AI Report
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

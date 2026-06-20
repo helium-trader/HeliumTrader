@@ -3,17 +3,57 @@
   min-height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: calc(var(--nav-height) + 80px) 24px 100px;
+  padding: calc(var(--nav-height) + 60px) 24px 80px;
   border-bottom: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+.heroInner {
+  max-width: var(--content-max-width);
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
 }
 
 .heroContent {
-  max-width: 720px;
-  text-align: center;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.heroImageWrap {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+  aspect-ratio: 4/3;
+}
+
+.heroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.75) saturate(0.85);
+  transition: filter 0.4s ease;
+}
+
+.heroImageWrap:hover .heroImage {
+  filter: brightness(0.85) saturate(1);
+}
+
+.heroImageOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.3) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
 }
 
 .heroBadge {
@@ -69,17 +109,17 @@
 
 .heroStats {
   display: flex;
-  gap: 56px;
+  gap: 40px;
   border-top: 1px solid var(--border-primary);
-  padding-top: 36px;
+  padding-top: 32px;
   width: 100%;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .heroStat {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
 }
 
@@ -296,11 +336,17 @@
   .stepConnector { display: none; }
 }
 
+@media (max-width: 1024px) {
+  .heroInner { grid-template-columns: 1fr; gap: 40px; }
+  .heroImageWrap { display: none; }
+  .heroContent { align-items: flex-start; }
+}
+
 @media (max-width: 640px) {
   .hero { min-height: auto; padding-top: calc(var(--nav-height) + 60px); }
   .heroActions { flex-direction: column; width: 100%; }
   .heroActions .btn { width: 100%; justify-content: center; }
-  .heroStats { gap: 32px; }
+  .heroStats { gap: 28px; }
   .featuresGrid { grid-template-columns: 1fr; }
   .stepsGrid { grid-template-columns: 1fr; gap: 32px; }
   .footerContent { flex-direction: column; gap: 12px; }

@@ -6,8 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import styles from "./Navbar.module.css";
 
-const navLinks = [
+const publicLinks = [
   { href: "/", label: "Home" },
+  { href: "/pricing", label: "Pricing" },
+];
+
+const authLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/simulate", label: "Simulate" },
   { href: "/reports", label: "Reports" },
@@ -77,7 +81,7 @@ export default function Navbar() {
         </Link>
 
         <div className={`${styles.links} ${mobileOpen ? styles.open : ""}`}>
-          {navLinks.map((link) => (
+          {(user ? authLinks : publicLinks).map((link) => (
             <Link
               key={link.href}
               href={link.href}

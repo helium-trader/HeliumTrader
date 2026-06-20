@@ -83,45 +83,56 @@ export default function Home() {
 
       {/* Hero */}
       <section className={styles.hero}>
-        <div className={styles.heroContent}>
-          <div className={styles.heroBadge}>
-            <span className={styles.heroBadgeDot} />
-            Built on Sui &middot; Powered by AI
+        <div className={styles.heroInner}>
+          <div className={styles.heroContent}>
+            <div className={styles.heroBadge}>
+              <span className={styles.heroBadgeDot} />
+              Built on Sui &middot; Powered by AI
+            </div>
+
+            <h1 className={styles.heroTitle}>
+              Algorithmic trading,{" "}
+              <span className={styles.heroTitleAccent}>democratized.</span>
+            </h1>
+
+            <p className={styles.heroDescription}>
+              Parameter-tuned strategies, backtesting simulation, on-chain paper
+              trading via Sui DeepBook, and AI-powered reports — all transparent
+              and free to start.
+            </p>
+
+            <div className={styles.heroActions}>
+              <Link href="/register" className="btn btn-primary btn-lg">
+                Get Started Free
+              </Link>
+              <Link href="/simulate" className="btn btn-secondary btn-lg">
+                Try Simulation
+              </Link>
+            </div>
+
+            <div className={styles.heroStats}>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>4</span>
+                <span className={styles.heroStatLabel}>Strategies</span>
+              </div>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>0</span>
+                <span className={styles.heroStatLabel}>Risk to start</span>
+              </div>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>&infin;</span>
+                <span className={styles.heroStatLabel}>Configurations</span>
+              </div>
+            </div>
           </div>
 
-          <h1 className={styles.heroTitle}>
-            Algorithmic trading,{" "}
-            <span className={styles.heroTitleAccent}>democratized.</span>
-          </h1>
-
-          <p className={styles.heroDescription}>
-            Parameter-tuned strategies, backtesting simulation, on-chain paper
-            trading via Sui DeepBook, and AI-powered reports — all transparent
-            and free to start.
-          </p>
-
-          <div className={styles.heroActions}>
-            <Link href="/register" className="btn btn-primary btn-lg">
-              Get Started Free
-            </Link>
-            <Link href="/simulate" className="btn btn-secondary btn-lg">
-              Try Simulation
-            </Link>
-          </div>
-
-          <div className={styles.heroStats}>
-            <div className={styles.heroStat}>
-              <span className={styles.heroStatValue}>4</span>
-              <span className={styles.heroStatLabel}>Strategies</span>
-            </div>
-            <div className={styles.heroStat}>
-              <span className={styles.heroStatValue}>0</span>
-              <span className={styles.heroStatLabel}>Risk to start</span>
-            </div>
-            <div className={styles.heroStat}>
-              <span className={styles.heroStatValue}>&infin;</span>
-              <span className={styles.heroStatLabel}>Configurations</span>
-            </div>
+          <div className={styles.heroImageWrap} aria-hidden="true">
+            <img
+              src="https://images.unsplash.com/photo-1689732888407-310424e3a372?w=900&auto=format&fit=crop&q=80"
+              alt="Live trading charts on multiple monitors"
+              className={styles.heroImage}
+            />
+            <div className={styles.heroImageOverlay} />
           </div>
         </div>
       </section>
