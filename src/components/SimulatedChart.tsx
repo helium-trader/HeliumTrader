@@ -240,6 +240,33 @@ function computeStrategy(
   return { lines, signals, band, legend };
 }
 
+/**
+ * Compute the ordered buy/sell signals for a strategy, applying the same
+ * fallback-strategy switching logic the chart uses. Exported so callers
+ * (e.g. the dashboard) can derive trades and performance metrics from real
+ * market data using the identical signal logic shown on the chart.
+ */
+export function computeSignals(
+  strategy: string,
+  closes: number[],
+  params: Record<string, number>,
+  opts?: { switchEnabled?: boolean; switchThreshold?: number; switchStrategy?: string }
+): { i: number; side: "buy" | "sell" }[] {
+  const primary = computeStrategy(strategy, closes, params);
+  const switchActive =
+    !!opts?.switchEnabled && opts?.switchThreshold != null && opts?.switchStrategy !== strategy;
+
+  if (!switchActive) return primary.signals;
+
+  const secondary = computeStrategy(opts!.switchStrategy as string, closes, params);
+  const below = (i: number) => closes[i] < (opts!.switchThreshold as number);
+
+  return [
+    ...primary.signals.filter((s) => !below(s.i)),
+    ...secondary.signals.filter((s) => below(s.i)),
+  ].sort((a, b) => a.i - b.i);
+}
+
 function SimulatedChart({
   timeframe,
   basePrice = 3.847,

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import SimulatedChart, { type Candle } from "@/components/SimulatedChart";
+import SimulatedChart, { computeSignals, type Candle } from "@/components/SimulatedChart";
 import CryptoTab from "@/components/CryptoTab";
 import TickerSearch from "@/components/TickerSearch";
 import styles from "./dashboard.module.css";
@@ -55,6 +55,17 @@ interface Trade {
   pnl: string;
   profit: boolean;
   price: string;
+}
+
+// A completed round-trip trade derived from real market signals (live market)
+interface LiveTrade {
+  id: number;
+  entryPrice: number;
+  exitPrice: number;
+  entryTime: number;
+  exitTime: number;
+  pnl: number;
+  profit: boolean;
 }
 
 const strategyLabels: Record<Strategy, string> = {
@@ -315,6 +326,81 @@ export default function DashboardPage() {
       worstTrade: allPnls.length ? Math.min(...allPnls) : 0,
     };
   }, [allPnls, equityCurve, portfolioChange]);
+
+  // Buy/sell signals from the strategy applied to real market data
+  const liveSignals = useMemo(() => {
+    if (!liveData || !liveAlgo || !liveCandles || liveCandles.length === 0) return [];
+    return computeSignals(
+      strategy,
+      liveCandles.map((c) => c.close),
+      currentParams as unknown as Record<string, number>,
+      { switchEnabled, switchThreshold, switchStrategy }
+    );
+  }, [liveData, liveAlgo, liveCandles, strategy, currentParams, switchEnabled, switchThreshold, switchStrategy]);
+
+  // Pair signals into completed round-trip trades (buy -> next sell) with PnL
+  const liveTrades = useMemo<LiveTrade[]>(() => {
+    if (!liveCandles || liveSignals.length === 0) return [];
+    const result: LiveTrade[] = [];
+    let entry: { i: number; price: number } | null = null;
+    let id = 1;
+    for (const sig of liveSignals) {
+      const candle = liveCandles[sig.i];
+      if (!candle) continue;
+      if (sig.side === "buy") {
+        if (!entry) entry = { i: sig.i, price: candle.close };
+      } else if (entry) {
+        const pnl = ((candle.close - entry.price) / entry.price) * 100;
+        result.push({
+          id: id++,
+          entryPrice: entry.price,
+          exitPrice: candle.close,
+          entryTime: liveCandles[entry.i]?.t ?? candle.t,
+          exitTime: candle.t,
+          pnl,
+          profit: pnl >= 0,
+        });
+        entry = null;
+      }
+    }
+    return result.reverse(); // most recent first
+  }, [liveCandles, liveSignals]);
+
+  // Performance metrics from completed live round-trip trades
+  const liveMetrics = useMemo(() => {
+    const pnls = liveTrades.map((t) => t.pnl);
+    const wins = pnls.filter((p) => p > 0);
+    const losses = pnls.filter((p) => p < 0);
+    const grossProfit = wins.reduce((a, b) => a + b, 0);
+    const grossLoss = Math.abs(losses.reduce((a, b) => a + b, 0));
+
+    // Compounded net return across the round trips
+    const netReturn = (liveTrades.reduce((acc, t) => acc * (1 + t.pnl / 100), 1) - 1) * 100;
+
+    // Max drawdown from the compounded equity curve (oldest -> newest)
+    let equity = 1;
+    let peak = 1;
+    let maxDd = 0;
+    for (let i = liveTrades.length - 1; i >= 0; i--) {
+      equity *= 1 + liveTrades[i].pnl / 100;
+      if (equity > peak) peak = equity;
+      const dd = (peak - equity) / peak;
+      if (dd > maxDd) maxDd = dd;
+    }
+
+    return {
+      netReturn,
+      maxDrawdown: maxDd * 100,
+      profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
+      winningTrades: wins.length,
+      losingTrades: losses.length,
+      avgWin: wins.length ? grossProfit / wins.length : 0,
+      avgLoss: losses.length ? grossLoss / losses.length : 0,
+      bestTrade: pnls.length ? Math.max(...pnls) : 0,
+      worstTrade: pnls.length ? Math.min(...pnls) : 0,
+      winRate: pnls.length ? (wins.length / pnls.length) * 100 : 0,
+    };
+  }, [liveTrades]);
 
   useEffect(() => {
     if (historyRef.current) historyRef.current.scrollTop = 0;
@@ -603,6 +689,116 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+            )}
+
+            {/* Live Market — Performance Metrics (strategy applied) */}
+            {liveData && liveAlgo && (
+              <div className={styles.metricsPanel}>
+                <div className={styles.metricsHeader}>
+                  <span className={styles.metricsTitle}>Performance Metrics</span>
+                  <span className="badge badge-accent">{strategyLabels[strategy]}</span>
+                </div>
+                {liveTrades.length > 0 ? (
+                  <div className={styles.metricsGrid}>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Net Return</span>
+                      <span className={`${styles.metricValue} ${liveMetrics.netReturn >= 0 ? "profit" : "loss"}`}>
+                        {liveMetrics.netReturn >= 0 ? "+" : ""}{liveMetrics.netReturn.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Win Rate</span>
+                      <span className={`${styles.metricValue} ${liveMetrics.winRate >= 50 ? "profit" : "loss"}`}>
+                        {liveMetrics.winRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Max Drawdown</span>
+                      <span className={`${styles.metricValue} loss`}>-{liveMetrics.maxDrawdown.toFixed(2)}%</span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Profit Factor</span>
+                      <span className={`${styles.metricValue} ${liveMetrics.profitFactor >= 1 ? "profit" : "loss"}`}>
+                        {liveMetrics.profitFactor === Infinity ? "∞" : liveMetrics.profitFactor.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Win / Loss</span>
+                      <span className={styles.metricValue}>
+                        <span className="profit">{liveMetrics.winningTrades}W</span>
+                        {" / "}
+                        <span className="loss">{liveMetrics.losingTrades}L</span>
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Avg Win</span>
+                      <span className={`${styles.metricValue} profit`}>+{liveMetrics.avgWin.toFixed(2)}%</span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Best Trade</span>
+                      <span className={`${styles.metricValue} profit`}>+{liveMetrics.bestTrade.toFixed(2)}%</span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Worst Trade</span>
+                      <span className={`${styles.metricValue} loss`}>{liveMetrics.worstTrade.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                      <circle cx="14" cy="14" r="12" stroke="var(--border-hover)" strokeWidth="1.5" />
+                      <path d="M10 14L13 17L18 11" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p>
+                      {liveSignals.length > 0
+                        ? `${liveSignals.length} signal${liveSignals.length === 1 ? "" : "s"} generated — no completed round-trip trades yet`
+                        : "No signals generated for this strategy on the selected range"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Live Market — Recent Trades (strategy applied) */}
+            {liveData && liveAlgo && (
+              <div className={styles.historyPanel}>
+                <div className={styles.historyHeader}>
+                  <span className={styles.historyTitle}>Recent Trades</span>
+                  {liveTrades.length > 0 && <span className="badge badge-accent">{liveTrades.length}</span>}
+                </div>
+                <div className={styles.historyBody}>
+                  {liveTrades.length > 0 ? (
+                    liveTrades.map((trade) => (
+                      <div className={styles.tradeRow} key={trade.id}>
+                        <div className={styles.tradeInfo}>
+                          <span
+                            className={styles.tradeType}
+                            style={{ color: trade.profit ? "var(--color-profit)" : "var(--color-loss)" }}
+                          >
+                            LONG {liveData.symbol}
+                          </span>
+                          <span className={styles.tradeTime}>
+                            {new Date(trade.exitTime).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                            {" · "}
+                            {fmtPrice(trade.entryPrice, liveData.currency)} → {fmtPrice(trade.exitPrice, liveData.currency)}
+                          </span>
+                        </div>
+                        <span className={styles.tradePnl} style={{ color: trade.profit ? "var(--color-profit)" : "var(--color-loss)" }}>
+                          {trade.pnl >= 0 ? "+" : ""}{trade.pnl.toFixed(2)}%
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className={styles.emptyState}>
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                        <circle cx="14" cy="14" r="12" stroke="var(--border-hover)" strokeWidth="1.5" />
+                        <path d="M10 14L13 17L18 11" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <p>No completed trades — adjust the strategy or time range</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
