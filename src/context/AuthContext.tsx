@@ -3,13 +3,14 @@
 import {
   createContext,
   useContext,
-  useState,
-  useEffect,
   useCallback,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
+import { authClient, useSession } from "@/lib/auth-client";
 
 interface User {
+  id: string;
   name: string;
   email: string;
   initials: string;
@@ -17,21 +18,21 @@ interface User {
 
 interface AuthContextValue {
   user: User | null;
-  login: (email: string, name?: string) => void;
-  logout: () => void;
+  loading: boolean;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
-  login: () => {},
-  logout: () => {},
+  loading: true,
+  logout: async () => {},
 });
 
-const STORAGE_KEY = "ht_user";
-
 function makeInitials(name: string): string {
-  return name
-    .split(" ")
+  const trimmed = (name || "").trim();
+  if (!trimmed) return "U";
+  return trimmed
+    .split(/\s+/)
     .map((w) => w[0])
     .join("")
     .slice(0, 2)
@@ -39,36 +40,27 @@ function makeInitials(name: string): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setUser(JSON.parse(stored));
-    } catch {
-      // ignore
-    }
-  }, []);
+  const sessionUser = session?.user;
+  const user: User | null = sessionUser
+    ? {
+        id: sessionUser.id,
+        name: sessionUser.name || sessionUser.email.split("@")[0],
+        email: sessionUser.email,
+        initials: makeInitials(sessionUser.name || sessionUser.email),
+      }
+    : null;
 
-  const login = useCallback((email: string, name?: string) => {
-    const displayName = name || email.split("@")[0];
-    const newUser: User = {
-      name: displayName,
-      email,
-      initials: makeInitials(displayName),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    setUser(newUser);
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
-  }, []);
+  const logout = useCallback(async () => {
+    await authClient.signOut();
+    router.push("/");
+    router.refresh();
+  }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading: isPending, logout }}>
       {children}
     </AuthContext.Provider>
   );
