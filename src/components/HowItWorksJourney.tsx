@@ -13,17 +13,20 @@ import {
   useScroll,
   useSpring,
   animate,
+  type Variants,
 } from "framer-motion";
 import styles from "./HowItWorksJourney.module.css";
 
 /* ---------------- helpers ---------------- */
 
-const fadeUp = {
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 32 },
   show: (i = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.6, delay: i * 0.08, ease: EASE },
   }),
 };
 
@@ -179,7 +182,7 @@ function StrategyMockup() {
             initial={{ opacity: 0, x: -24 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 0.5, delay: i * 0.14, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.5, delay: i * 0.14, ease: EASE }}
           >
             <span className={styles.stratIcon}>
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -354,7 +357,7 @@ function CountUp({
     if (!start) return;
     const controls = animate(mv, to, {
       duration: 1.4,
-      ease: [0.22, 1, 0.36, 1],
+      ease: EASE,
       onUpdate: (v) => setDisplay(v.toFixed(decimals)),
     });
     return () => controls.stop();
