@@ -117,6 +117,9 @@ export default function PaperTrading() {
   // Live mark prices for every symbol we care about (positions + selected).
   const [prices, setPrices] = useState<Record<string, number>>({});
 
+  // Trading method: the user picks one of manual OR algorithmic, never both.
+  const [tradeMode, setTradeMode] = useState<"manual" | "algo">("manual");
+
   // Manual trade controls
   const [qtyInput, setQtyInput] = useState("");
   const [tradeMsg, setTradeMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -713,7 +716,28 @@ export default function PaperTrading() {
               )}
             </div>
 
+            {/* Trading method switch — manual OR algorithm, not both */}
+            <div className={styles.modeSwitch} role="tablist" aria-label="Trading method">
+              <button
+                role="tab"
+                aria-selected={tradeMode === "manual"}
+                className={`${styles.modeBtn} ${tradeMode === "manual" ? styles.modeBtnActive : ""}`}
+                onClick={() => { setEngineOn(false); setTradeMode("manual"); }}
+              >
+                Manual
+              </button>
+              <button
+                role="tab"
+                aria-selected={tradeMode === "algo"}
+                className={`${styles.modeBtn} ${tradeMode === "algo" ? styles.modeBtnActive : ""}`}
+                onClick={() => setTradeMode("algo")}
+              >
+                Algorithm
+              </button>
+            </div>
+
             {/* Manual trade */}
+            {tradeMode === "manual" && (
             <div className={styles.card}>
               <span className={styles.cardLabel}>Manual Order · {instrument.symbol}</span>
               {positionForSymbol && (
@@ -761,8 +785,10 @@ export default function PaperTrading() {
                 <p className={tradeMsg.kind === "ok" ? styles.msgOk : styles.msgErr}>{tradeMsg.text}</p>
               )}
             </div>
+            )}
 
             {/* Strategy engine */}
+            {tradeMode === "algo" && (
             <div className={styles.card}>
               <div className={styles.engineHead}>
                 <span className={styles.cardLabel}>Strategy Engine</span>
@@ -858,6 +884,7 @@ export default function PaperTrading() {
                 </div>
               )}
             </div>
+            )}
 
             <button className={styles.resetBtn} onClick={handleReset} disabled={busy}>
               Reset {market === "crypto" ? "Crypto" : "Stock"} Account
