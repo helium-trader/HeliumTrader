@@ -39,16 +39,29 @@ export async function streamReport(
       if (!trimmed.startsWith("data:")) continue;
       const data = trimmed.slice(5).trim();
       if (data === "[DONE]") return full;
+      let chunk: { type?: string; delta?: unknown; errorText?: unknown };
       try {
-        const chunk = JSON.parse(data);
-        if (chunk.type === "text-delta" && typeof chunk.delta === "string") {
-          full += chunk.delta;
-          onDelta(full);
-        }
+        chunk = JSON.parse(data);
       } catch {
-        /* ignore non-JSON keep-alive lines */
+        continue; // non-JSON keep-alive line
+      }
+      if (chunk.type === "text-delta" && typeof chunk.delta === "string") {
+        full += chunk.delta;
+        onDelta(full);
+      } else if (chunk.type === "error") {
+        // The AI SDK encodes mid-stream failures (e.g. provider/gateway
+        // errors) as an `error` chunk over an otherwise-200 response.
+        throw new Error(
+          typeof chunk.errorText === "string" && chunk.errorText
+            ? chunk.errorText
+            : "The AI provider could not generate this report."
+        );
       }
     }
+  }
+
+  if (!full.trim()) {
+    throw new Error("No report content was generated. Please try again.");
   }
 
   return full;
