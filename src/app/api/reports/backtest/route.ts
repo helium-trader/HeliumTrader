@@ -3,9 +3,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { report } from "@/lib/db/schema";
 import { formatAiStreamError } from "@/lib/ai-error";
+import { reportModel } from "@/lib/ai-model";
 import type { BacktestMetrics } from "@/lib/backtest";
-
-const MODEL = "openai/gpt-5-mini";
 
 interface Body {
   symbol?: string;
@@ -52,7 +51,7 @@ export async function POST(req: Request) {
   ].join("\n");
 
   const result = streamText({
-    model: MODEL,
+    model: reportModel,
     system:
       "You are a quantitative trading analyst writing a concise backtest report. " +
       "Use ONLY the metrics provided — never invent numbers. Write in clear markdown with these sections: " +

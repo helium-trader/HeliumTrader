@@ -3,8 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { report } from "@/lib/db/schema";
 import { formatAiStreamError } from "@/lib/ai-error";
-
-const MODEL = "openai/gpt-5-mini";
+import { reportModel } from "@/lib/ai-model";
 
 interface PositionFact {
   symbol: string;
@@ -94,7 +93,7 @@ export async function POST(req: Request) {
   ].join("\n");
 
   const result = streamText({
-    model: MODEL,
+    model: reportModel,
     system:
       "You are a trading coach writing a concise end-of-day review of a trader's paper account. " +
       "Use ONLY the data provided — never invent numbers or trades. Write in clear markdown with these sections: " +
