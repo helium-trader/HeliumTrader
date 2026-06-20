@@ -81,6 +81,67 @@ function rollingStd(
   return out;
 }
 
+// Compute the BUY / SELL / HOLD signal at every bar in the series. Uses the
+// exact same indicator math and cross-detection rules as evaluateSignal, but
+// returns a full array so the backtest engine can replay the strategy bar by
+// bar over historical data. Index 0..n-1 aligns with `closes`.
+export function computeSignalSeries(
+  closes: number[],
+  strategy: StrategyId,
+  params: StrategyParams = {}
+): Signal[] {
+  const n = closes.length;
+  const out: Signal[] = new Array(n).fill("HOLD");
+  if (n < 3) return out;
+
+  if (strategy === "sma_crossover" || strategy === "macd") {
+    const fastP = (params.fastPeriod ?? (strategy === "macd" ? 12 : 9)) | 0;
+    const slowP = (params.slowPeriod ?? (strategy === "macd" ? 26 : 21)) | 0;
+    const fast = strategy === "macd" ? ema(closes, fastP) : sma(closes, fastP);
+    const slow = strategy === "macd" ? ema(closes, slowP) : sma(closes, slowP);
+    for (let i = 1; i < n; i++) {
+      const f0 = fast[i - 1], s0 = slow[i - 1], f1 = fast[i], s1 = slow[i];
+      if (f0 == null || s0 == null || f1 == null || s1 == null) continue;
+      if (f0 <= s0 && f1 > s1) out[i] = "BUY";
+      else if (f0 >= s0 && f1 < s1) out[i] = "SELL";
+    }
+    return out;
+  }
+
+  if (strategy === "rsi") {
+    const period = (params.period ?? 14) | 0;
+    const oversold = params.oversold ?? 30;
+    const overbought = params.overbought ?? 70;
+    const r = rsiSeries(closes, period);
+    for (let i = 1; i < n; i++) {
+      const r0 = r[i - 1], r1 = r[i];
+      if (r0 == null || r1 == null) continue;
+      if (r0 <= oversold && r1 > oversold) out[i] = "BUY";
+      else if (r0 >= overbought && r1 < overbought) out[i] = "SELL";
+    }
+    return out;
+  }
+
+  if (strategy === "bollinger") {
+    const period = (params.period ?? 20) | 0;
+    const mult = params.stdDev ?? 2;
+    const mid = sma(closes, period);
+    const std = rollingStd(closes, mid, period);
+    for (let i = 1; i < n; i++) {
+      const m0 = mid[i - 1], d0 = std[i - 1], m1 = mid[i], d1 = std[i];
+      const lower0 = m0 != null && d0 != null ? m0 - mult * d0 : null;
+      const lower1 = m1 != null && d1 != null ? m1 - mult * d1 : null;
+      const upper0 = m0 != null && d0 != null ? m0 + mult * d0 : null;
+      const upper1 = m1 != null && d1 != null ? m1 + mult * d1 : null;
+      if (lower1 != null && lower0 != null && closes[i - 1] >= lower0 && closes[i] < lower1) out[i] = "BUY";
+      else if (upper1 != null && upper0 != null && closes[i - 1] <= upper0 && closes[i] > upper1) out[i] = "SELL";
+    }
+    return out;
+  }
+
+  return out;
+}
+
 // Evaluate the signal at the most recent candle (cross detected on last bar).
 export function evaluateSignal(
   closes: number[],

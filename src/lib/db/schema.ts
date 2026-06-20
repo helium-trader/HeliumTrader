@@ -5,6 +5,7 @@ import {
   boolean,
   doublePrecision,
   serial,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // --- Better Auth required tables -------------------------------------------
@@ -99,5 +100,22 @@ export const trade = pgTable("trade", {
   realizedPnl: doublePrecision("realizedPnl").notNull().default(0),
   source: text("source").notNull().default("manual"), // "manual" | "strategy"
   strategy: text("strategy"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+});
+
+// --- AI-generated reports --------------------------------------------------
+// Persists both backtest analyses (kind="backtest") and end-of-day paper
+// trading reviews (kind="eod"). Per-user scoping via plain `userId`.
+
+export const report = pgTable("report", {
+  id: serial("id").primaryKey(),
+  userId: text("userId").notNull(),
+  kind: text("kind").notNull(), // "backtest" | "eod"
+  title: text("title").notNull(),
+  symbol: text("symbol"),
+  strategy: text("strategy"),
+  summary: text("summary"),
+  content: text("content").notNull(),
+  metrics: jsonb("metrics"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 });

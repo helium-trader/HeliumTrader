@@ -6,6 +6,8 @@ import Navbar from "@/components/Navbar";
 import SimulatedChart, { computeSignals, type Candle } from "@/components/SimulatedChart";
 import CryptoTab from "@/components/CryptoTab";
 import TickerSearch from "@/components/TickerSearch";
+import BacktestReport from "@/components/BacktestReport";
+import type { BacktestTrade, BacktestMetrics } from "@/lib/backtest";
 import styles from "./dashboard.module.css";
 
 // --- Types ---
@@ -55,6 +57,20 @@ interface Trade {
   pnl: string;
   profit: boolean;
   price: string;
+}
+
+// Shape returned by POST /api/backtest
+interface BacktestResponse {
+  symbol: string;
+  name: string;
+  currency: string;
+  period: string;
+  currentPrice: number;
+  candles: StockData[];
+  strategy: Strategy;
+  trades: BacktestTrade[];
+  equityCurve: { time: string; equity: number }[];
+  metrics: BacktestMetrics;
 }
 
 // A completed round-trip trade derived from real market signals (live market)
@@ -112,6 +128,7 @@ export default function DashboardPage() {
   const [mode] = useState<Mode>("simulate");
   const [strategy, setStrategy] = useState<Strategy>("sma_crossover");
   const [params, setParams] = useState(defaultParams);
+  const currentParams = params[strategy];
   // Strategy switcher: swap to a fallback strategy when price drops below threshold
   const [switchEnabled, setSwitchEnabled] = useState(false);
   const [switchThreshold, setSwitchThreshold] = useState(3.8);
@@ -122,6 +139,11 @@ export default function DashboardPage() {
   const [simDone, setSimDone] = useState(false);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [allPnls, setAllPnls] = useState<number[]>([]);
+  // Real backtest (Simulation tab): symbol + period to test against
+  const [simSymbol, setSimSymbol] = useState("AAPL");
+  const [simPeriod, setSimPeriod] = useState("1y");
+  const [backtest, setBacktest] = useState<BacktestResponse | null>(null);
+  const [simError, setSimError] = useState<string | null>(null);
   const [tvSymbol, setTvSymbol] = useState("BINANCE:SUIUSDT");
   const [pairLabel, setPairLabel] = useState("SIM / USD");
   const [livePrice, setLivePrice] = useState(3.847);
@@ -204,60 +226,72 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, [priceDir]);
 
-  // Simulation runner
-  const runSimulation = useCallback(() => {
+  // Simulation runner — runs a real historical backtest of the selected
+  // strategy against actual OHLCV market data via /api/backtest.
+  const runSimulation = useCallback(async () => {
     if (running) return;
+    const symbol = simSymbol.trim().toUpperCase();
+    if (!symbol) {
+      setSimError("Enter a ticker symbol to backtest.");
+      return;
+    }
     setRunning(true);
     setSimDone(false);
-    setProgress(0);
-    setTrades([]);
-    setAllPnls([]);
+    setSimError(null);
+    setProgress(15);
+    setBacktest(null);
 
-    const totalSteps = 20;
-    let step = 0;
+    try {
+      const res = await fetch("/api/backtest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol,
+          period: simPeriod,
+          strategy,
+          params: currentParams,
+          switchEnabled,
+          switchThreshold,
+          switchStrategy,
+        }),
+      });
+      setProgress(70);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Backtest failed.");
 
-    const interval = setInterval(() => {
-      step++;
-      setProgress(Math.round((step / totalSteps) * 100));
+      const data = json as BacktestResponse;
+      setBacktest(data);
+      setProgress(100);
 
-      if (step % 3 === 0) {
-        const isProfit = Math.random() < winRate / 100;
-        const pnlValue = parseFloat((Math.random() * 3.5 + 0.2).toFixed(2)) * (isProfit ? 1 : -1);
-        const newTrade: Trade = {
-          id: tradeIdRef.current++,
-          type: Math.random() > 0.5 ? "BUY" : "SELL",
-          pair: "SIM/USD",
-          time: formatTime(),
-          pnl: `${pnlValue >= 0 ? "+" : ""}${pnlValue.toFixed(2)}%`,
-          profit: isProfit,
-          price: `$${(livePrice + (Math.random() - 0.5) * 0.2).toFixed(3)}`,
-        };
-        setTrades((prev) => [newTrade, ...prev].slice(0, 12));
-        setAllPnls((prev) => [...prev, pnlValue]);
-        setTotalTrades((t) => t + 1);
-        setPortfolio((p) => {
-          const delta = isProfit
-            ? p * (0.004 + Math.random() * 0.012)
-            : -p * (0.002 + Math.random() * 0.008);
-          return parseFloat((p + delta).toFixed(2));
-        });
-        setWinRate((w) => {
-          const noise = (Math.random() - 0.5) * 0.8;
-          return parseFloat(Math.min(Math.max(w + noise, 45), 80).toFixed(1));
-        });
-        setSharpe((s) => {
-          const noise = (Math.random() - 0.5) * 0.05;
-          return parseFloat(Math.max(s + noise, 0.8).toFixed(2));
-        });
-      }
-
-      if (step >= totalSteps) {
-        clearInterval(interval);
-        setRunning(false);
-        setSimDone(true);
-      }
-    }, 120);
-  }, [running, winRate, livePrice]);
+      // Mirror engine output into the existing stat/trade panels.
+      setAllPnls(data.trades.map((t) => t.pnlPct));
+      setTotalTrades(data.metrics.totalTrades);
+      setWinRate(data.metrics.winRate);
+      setSharpe(data.metrics.sharpe);
+      setPortfolio(data.metrics.finalEquity / 10); // scaled to ~10k base for display
+      setTrades(
+        data.trades
+          .slice()
+          .reverse()
+          .slice(0, 12)
+          .map((t) => ({
+            id: t.id,
+            type: "SELL" as const,
+            pair: `${data.symbol}/USD`,
+            time: new Date(t.exitTime).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            pnl: `${t.pnlPct >= 0 ? "+" : ""}${t.pnlPct.toFixed(2)}%`,
+            profit: t.profit,
+            price: `$${t.exitPrice.toFixed(2)}`,
+          }))
+      );
+      setSimDone(true);
+    } catch (err) {
+      setSimError((err as Error).message);
+      setProgress(0);
+    } finally {
+      setRunning(false);
+    }
+  }, [running, simSymbol, simPeriod, strategy, currentParams, switchEnabled, switchThreshold, switchStrategy]);
 
   const resetParams = () => {
     setParams(defaultParams);
@@ -265,6 +299,8 @@ export default function DashboardPage() {
     setTrades([]);
     setAllPnls([]);
     setProgress(0);
+    setBacktest(null);
+    setSimError(null);
   };
 
   const updateParam = (key: string, value: number) => {
@@ -274,7 +310,41 @@ export default function DashboardPage() {
     }));
   };
 
-  const currentParams = params[strategy];
+  // Real backtest candles for the chart (Simulation tab)
+  const backtestCandles = useMemo<Candle[] | undefined>(() => {
+    if (!backtest) return undefined;
+    return backtest.candles.map((d) => ({
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+      volume: d.volume,
+      t: new Date(d.time).getTime(),
+    }));
+  }, [backtest]);
+
+  // SVG path for the real backtest equity curve
+  const backtestEquityPath = useMemo(() => {
+    if (!backtest || backtest.equityCurve.length < 2) return null;
+    const values = backtest.equityCurve.map((p) => p.equity);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const w = 100;
+    const h = 60;
+    const pts = values.map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x},${y}`;
+    });
+    const start = values[0];
+    const end = values[values.length - 1];
+    return {
+      path: "M" + pts.join(" L"),
+      up: end >= start,
+      changePct: start ? (((end - start) / start) * 100).toFixed(2) : "0.00",
+    };
+  }, [backtest]);
 
   // Equity curve SVG path
   const eqMin = Math.min(...equityCurve);
@@ -561,6 +631,18 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
+                ) : backtest ? (
+                  <SimulatedChart
+                    timeframe="1D"
+                    staticCandles={backtestCandles}
+                    strategy={strategy}
+                    showAlgo
+                    params={currentParams as unknown as Record<string, number>}
+                    switchEnabled={switchEnabled}
+                    switchThreshold={switchThreshold}
+                    switchStrategy={switchStrategy}
+                    ariaLabel={`${backtest.symbol} backtest candlestick chart`}
+                  />
                 ) : (
                   <SimulatedChart
                     timeframe={activeTimeframe}
@@ -577,80 +659,107 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Equity Curve */}
-            {!liveData && (simDone || trades.length > 0) && (
+            {/* Equity Curve — real backtest */}
+            {!liveData && backtestEquityPath && (
               <div className={styles.equityPanel}>
                 <div className={styles.equityHeader}>
                   <span className={styles.equityTitle}>Equity Curve</span>
-                  <span className={`badge ${portfolioUp ? "badge-profit" : "badge-loss"}`}>
-                    {portfolioUp ? "+" : ""}{portfolioChange}% all time
+                  <span className={`badge ${backtestEquityPath.up ? "badge-profit" : "badge-loss"}`}>
+                    {backtestEquityPath.up ? "+" : ""}{backtestEquityPath.changePct}% over test
                   </span>
                 </div>
                 <div className={styles.equityBody}>
                   <svg viewBox={`0 0 ${eqW} ${eqH}`} preserveAspectRatio="none" className={styles.equitySvg} aria-hidden="true">
                     <defs>
                       <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={portfolioUp ? "#22c55e" : "#ef4444"} stopOpacity="0.25" />
-                        <stop offset="100%" stopColor={portfolioUp ? "#22c55e" : "#ef4444"} stopOpacity="0" />
+                        <stop offset="0%" stopColor={backtestEquityPath.up ? "#22c55e" : "#ef4444"} stopOpacity="0.25" />
+                        <stop offset="100%" stopColor={backtestEquityPath.up ? "#22c55e" : "#ef4444"} stopOpacity="0" />
                       </linearGradient>
                     </defs>
-                    <path d={`${eqPath} L${eqW},${eqH} L0,${eqH} Z`} fill="url(#eq-grad)" />
-                    <path d={eqPath} fill="none" stroke={portfolioUp ? "#22c55e" : "#ef4444"} strokeWidth="1.5" />
+                    <path d={`${backtestEquityPath.path} L${eqW},${eqH} L0,${eqH} Z`} fill="url(#eq-grad)" />
+                    <path d={backtestEquityPath.path} fill="none" stroke={backtestEquityPath.up ? "#22c55e" : "#ef4444"} strokeWidth="1.5" />
                   </svg>
                 </div>
               </div>
             )}
 
-            {/* Performance Metrics */}
-            {!liveData && simDone && allPnls.length > 0 && (
+            {/* Performance Metrics — real backtest */}
+            {!liveData && backtest && (
               <div className={styles.metricsPanel}>
                 <div className={styles.metricsHeader}>
                   <span className={styles.metricsTitle}>Performance Metrics</span>
-                  <span className="badge badge-accent">{strategyLabels[strategy]}</span>
+                  <span className="badge badge-accent">{strategyLabels[strategy]} · {backtest.symbol}</span>
                 </div>
-                <div className={styles.metricsGrid}>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Net Return</span>
-                    <span className={`${styles.metricValue} ${metrics.netReturn >= 0 ? "profit" : "loss"}`}>
-                      {metrics.netReturn >= 0 ? "+" : ""}{metrics.netReturn.toFixed(2)}%
-                    </span>
+                {backtest.metrics.totalTrades > 0 ? (
+                  <div className={styles.metricsGrid}>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Net Return</span>
+                      <span className={`${styles.metricValue} ${backtest.metrics.totalReturn >= 0 ? "profit" : "loss"}`}>
+                        {backtest.metrics.totalReturn >= 0 ? "+" : ""}{backtest.metrics.totalReturn.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Win Rate</span>
+                      <span className={`${styles.metricValue} ${backtest.metrics.winRate >= 50 ? "profit" : "loss"}`}>
+                        {backtest.metrics.winRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Max Drawdown</span>
+                      <span className={`${styles.metricValue} loss`}>-{backtest.metrics.maxDrawdown.toFixed(2)}%</span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Profit Factor</span>
+                      <span className={`${styles.metricValue} ${backtest.metrics.profitFactor === -1 || backtest.metrics.profitFactor >= 1 ? "profit" : "loss"}`}>
+                        {backtest.metrics.profitFactor === -1 ? "∞" : backtest.metrics.profitFactor.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Win / Loss</span>
+                      <span className={styles.metricValue}>
+                        <span className="profit">{backtest.metrics.winningTrades}W</span>
+                        {" / "}
+                        <span className="loss">{backtest.metrics.losingTrades}L</span>
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Sharpe</span>
+                      <span className={`${styles.metricValue} ${backtest.metrics.sharpe >= 1 ? "profit" : ""}`}>
+                        {backtest.metrics.sharpe.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Best Trade</span>
+                      <span className={`${styles.metricValue} profit`}>+{backtest.metrics.bestTrade.toFixed(2)}%</span>
+                    </div>
+                    <div className={styles.metricCard}>
+                      <span className={styles.metricLabel}>Worst Trade</span>
+                      <span className={`${styles.metricValue} loss`}>{backtest.metrics.worstTrade.toFixed(2)}%</span>
+                    </div>
                   </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Max Drawdown</span>
-                    <span className={`${styles.metricValue} loss`}>-{metrics.maxDrawdown.toFixed(2)}%</span>
+                ) : (
+                  <div className={styles.emptyState}>
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+                      <circle cx="14" cy="14" r="12" stroke="var(--border-hover)" strokeWidth="1.5" />
+                      <path d="M10 14L13 17L18 11" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p>No completed trades for {strategyLabels[strategy]} on {backtest.symbol} over this range — adjust the strategy or period.</p>
                   </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Profit Factor</span>
-                    <span className={`${styles.metricValue} ${metrics.profitFactor >= 1 ? "profit" : "loss"}`}>
-                      {metrics.profitFactor === Infinity ? "∞" : metrics.profitFactor.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Win / Loss</span>
-                    <span className={styles.metricValue}>
-                      <span className="profit">{metrics.winningTrades}W</span>
-                      {" / "}
-                      <span className="loss">{metrics.losingTrades}L</span>
-                    </span>
-                  </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Avg Win</span>
-                    <span className={`${styles.metricValue} profit`}>+{metrics.avgWin.toFixed(2)}%</span>
-                  </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Avg Loss</span>
-                    <span className={`${styles.metricValue} loss`}>-{metrics.avgLoss.toFixed(2)}%</span>
-                  </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Best Trade</span>
-                    <span className={`${styles.metricValue} profit`}>+{metrics.bestTrade.toFixed(2)}%</span>
-                  </div>
-                  <div className={styles.metricCard}>
-                    <span className={styles.metricLabel}>Worst Trade</span>
-                    <span className={`${styles.metricValue} loss`}>{metrics.worstTrade.toFixed(2)}%</span>
-                  </div>
-                </div>
+                )}
               </div>
+            )}
+
+            {/* AI Backtest Report */}
+            {!liveData && backtest && backtest.metrics.totalTrades > 0 && (
+              <BacktestReport
+                symbol={backtest.symbol}
+                name={backtest.name}
+                period={backtest.period}
+                strategy={strategy}
+                strategyLabel={strategyLabels[strategy]}
+                metrics={backtest.metrics}
+                tradeCount={backtest.trades.length}
+              />
             )}
 
             {/* Recent Trades */}
@@ -832,6 +941,37 @@ export default function DashboardPage() {
             {/* Parameters Tab */}
             {sidebarTab === "params" && (
               <div className={styles.sidebarContent}>
+                {/* Backtest target: symbol + historical period */}
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel} htmlFor="simSymbol">Symbol</label>
+                  <input
+                    id="simSymbol"
+                    type="text"
+                    className={styles.tickerInput}
+                    placeholder="e.g. AAPL"
+                    value={simSymbol}
+                    onChange={(e) => setSimSymbol(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !running) runSimulation(); }}
+                  />
+                </div>
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel}>Backtest Period</label>
+                  <select
+                    className={styles.strategySelect}
+                    value={simPeriod}
+                    onChange={(e) => setSimPeriod(e.target.value)}
+                  >
+                    {periodOptions.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                  <p className={styles.strategyDesc}>
+                    Backtests the strategy against real historical market data.
+                  </p>
+                </div>
+
+                <div className={styles.paramDivider} />
+
                 {/* Strategy selector */}
                 <div className={styles.paramGroup}>
                   <label className={styles.paramLabel}>Strategy</label>
@@ -1035,7 +1175,7 @@ export default function DashboardPage() {
                 {running && (
                   <div className={styles.progressGroup}>
                     <div className={styles.progressLabel}>
-                      <span>Running simulation...</span>
+                      <span>Running backtest...</span>
                       <span className={styles.progressPct}>{progress}%</span>
                     </div>
                     <div className={styles.progressTrack}>
@@ -1044,9 +1184,16 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {simDone && (
+                {simError && (
+                  <div className={styles.simResult} style={{ color: "var(--color-loss)" }}>
+                    {simError}
+                  </div>
+                )}
+
+                {simDone && backtest && !simError && (
                   <div className={styles.simResult}>
-                    Simulation complete — {trades.length} signals generated
+                    Backtest complete — {backtest.metrics.totalTrades} trade
+                    {backtest.metrics.totalTrades === 1 ? "" : "s"} on {backtest.symbol} ({backtest.period})
                   </div>
                 )}
 
@@ -1054,10 +1201,10 @@ export default function DashboardPage() {
                   <button
                     className={`btn btn-primary ${running ? styles.btnRunning : ""}`}
                     style={{ width: "100%" }}
-                    onClick={mode === "simulate" ? runSimulation : undefined}
+                    onClick={runSimulation}
                     disabled={running}
                   >
-                    {running ? "Running..." : mode === "simulate" ? "Run Simulation" : "Start Paper Trading"}
+                    {running ? "Running..." : "Run Backtest"}
                   </button>
                   <button className="btn btn-secondary" style={{ width: "100%" }} onClick={resetParams}>
                     Reset
