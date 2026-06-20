@@ -4,64 +4,76 @@ import styles from "./page.module.css";
 
 const features = [
   {
-    icon: "⚡",
     title: "Parameter-Tuned Strategies",
     description:
-      "Fine-tune SMA Crossover, RSI, Bollinger Bands, and MACD strategies with interactive sliders. Find the perfect configuration for any market condition.",
+      "Fine-tune SMA Crossover, RSI, Bollinger Bands, and MACD with interactive sliders. Find the optimal configuration for any market condition.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4 10h12M4 6h6M4 14h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
   },
   {
-    icon: "📊",
     title: "Backtesting Simulation",
     description:
-      "Run your strategies against historical crypto data. See equity curves, win rates, Sharpe ratios, and maximum drawdown before risking a single token.",
+      "Run strategies against historical crypto data. View equity curves, win rates, Sharpe ratios, and max drawdown before risking a single token.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M3 14l4-4 3 3 4-6 3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
   },
   {
-    icon: "🔗",
     title: "On-Chain Paper Trading",
     description:
-      "Paper trade on Sui's DeepBook with virtual balances. Test your strategies against real-time order book data — transparently and on-chain.",
+      "Paper trade on Sui&apos;s DeepBook with virtual balances. Test strategies against real-time order book data — transparently on-chain.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M7 10h6M10 7v6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
   },
   {
-    icon: "🤖",
     title: "AI-Powered Reports",
     description:
-      "Get intelligent analysis of your trading performance. AI identifies patterns, suggests parameter tweaks, and generates daily summary reports.",
+      "Intelligent analysis of your trading performance. AI identifies patterns, suggests parameter tweaks, and generates daily summary reports.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M10 7v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
   },
   {
-    icon: "💾",
     title: "Decentralized Storage",
     description:
       "Trading reports and strategy configs stored on Walrus — permanent, verifiable, and censorship-resistant. Your data, your control.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M3 7l7-4 7 4v6l-7 4-7-4V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      </svg>
+    ),
   },
   {
-    icon: "🌍",
     title: "Democratized Trading",
     description:
-      "Institutional-grade algorithmic trading tools, accessible to everyone. No black boxes, no gatekeeping — just transparent, on-chain strategies.",
+      "Institutional-grade algorithmic tools, accessible to everyone. No black boxes, no gatekeeping — just transparent, on-chain strategies.",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <circle cx="7" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+        <circle cx="13" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M2 16c0-2.5 2-4 5-4M13 12c3 0 5 1.5 5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
   },
 ];
 
 const steps = [
-  {
-    title: "Choose Strategy",
-    description:
-      "Select from pre-built algorithmic strategies like SMA Crossover, RSI, or MACD.",
-  },
-  {
-    title: "Tune Parameters",
-    description:
-      "Adjust periods, thresholds, stop-loss, and take-profit levels with intuitive controls.",
-  },
-  {
-    title: "Simulate & Test",
-    description:
-      "Backtest against historical data or paper trade live. See real-time performance metrics.",
-  },
-  {
-    title: "Get AI Insights",
-    description:
-      "Receive AI-generated reports with performance analysis and optimization suggestions.",
-  },
+  { num: "01", title: "Choose a Strategy", description: "Select from SMA Crossover, RSI, Bollinger Bands, or MACD." },
+  { num: "02", title: "Tune Parameters", description: "Adjust periods, thresholds, stop-loss and take-profit with intuitive controls." },
+  { num: "03", title: "Simulate & Test", description: "Backtest against historical data or paper trade live on Sui DeepBook." },
+  { num: "04", title: "Get AI Insights", description: "Receive AI reports with performance analysis and optimization suggestions." },
 ];
 
 export default function Home() {
@@ -69,127 +81,122 @@ export default function Home() {
     <>
       <Navbar />
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className={styles.hero}>
-        <div className={styles.heroBg}>
-          <div className={styles.heroGlow} />
-          <div className={styles.heroGlowSecondary} />
-          <div className={styles.gridOverlay} />
-        </div>
+        <div className={styles.heroInner}>
+          <div className={styles.heroContent}>
+            <div className={styles.heroBadge}>
+              <span className={styles.heroBadgeDot} />
+              Built on Sui &middot; Powered by AI
+            </div>
 
-        <div className={styles.heroContent}>
-          <div className={styles.heroBadge}>
-            <span className={styles.heroBadgeDot} />
-            Built on Sui &middot; Powered by AI
+            <h1 className={styles.heroTitle}>
+              Algorithmic trading,{" "}
+              <span className={styles.heroTitleAccent}>democratized.</span>
+            </h1>
+
+            <p className={styles.heroDescription}>
+              Parameter-tuned strategies, backtesting simulation, on-chain paper
+              trading via Sui DeepBook, and AI-powered reports — all transparent
+              and free to start.
+            </p>
+
+            <div className={styles.heroActions}>
+              <Link href="/register" className="btn btn-primary btn-lg">
+                Get Started Free
+              </Link>
+              <Link href="/simulate" className="btn btn-secondary btn-lg">
+                Try Simulation
+              </Link>
+            </div>
+
+            <div className={styles.heroStats}>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>4</span>
+                <span className={styles.heroStatLabel}>Strategies</span>
+              </div>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>0</span>
+                <span className={styles.heroStatLabel}>Risk to start</span>
+              </div>
+              <div className={styles.heroStat}>
+                <span className={styles.heroStatValue}>&infin;</span>
+                <span className={styles.heroStatLabel}>Configurations</span>
+              </div>
+            </div>
           </div>
 
-          <h1 className={styles.heroTitle}>
-            Algorithmic Crypto Trading,{" "}
-            <span className={styles.heroTitleAccent}>Democratized.</span>
-          </h1>
-
-          <p className={styles.heroDescription}>
-            Parameter-tuned trading strategies with backtesting simulation,
-            on-chain paper trading via Sui DeepBook, and AI-powered performance
-            reports — all transparent, accessible, and free.
-          </p>
-
-          <div className={styles.heroActions}>
-            <Link href="/dashboard" className="btn btn-primary btn-lg">
-              <span>🚀</span> Launch Dashboard
-            </Link>
-            <Link href="/simulate" className="btn btn-secondary btn-lg">
-              <span>📈</span> Try Simulation
-            </Link>
-          </div>
-
-          <div className={styles.heroStats}>
-            <div className={styles.heroStat}>
-              <span className={`${styles.heroStatValue} profit`}>4</span>
-              <span className={styles.heroStatLabel}>Strategies</span>
-            </div>
-            <div className={styles.heroStat}>
-              <span className={styles.heroStatValue}>∞</span>
-              <span className={styles.heroStatLabel}>Configurations</span>
-            </div>
-            <div className={styles.heroStat}>
-              <span className={`${styles.heroStatValue} profit`}>0</span>
-              <span className={styles.heroStatLabel}>Risk to Start</span>
-            </div>
+          <div className={styles.heroImageWrap} aria-hidden="true">
+            <img
+              src="https://images.unsplash.com/photo-1689732888407-310424e3a372?w=900&auto=format&fit=crop&q=80"
+              alt="Live trading charts on multiple monitors"
+              className={styles.heroImage}
+            />
+            <div className={styles.heroImageOverlay} />
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features */}
       <section className={styles.features} id="features">
-        <div className={styles.featuresDivider} />
-        <div className={styles.featuresHeader}>
-          <p className={styles.featuresLabel}>Features</p>
-          <h2 className={styles.featuresTitle}>
-            Everything You Need to Trade Smarter
-          </h2>
-          <p className={styles.featuresSubtitle}>
-            From strategy selection to AI insights — a complete algorithmic
-            trading toolkit built for everyone.
-          </p>
-        </div>
+        <div className="page-container">
+          <div className={styles.sectionHeader}>
+            <p className={styles.sectionLabel}>Features</p>
+            <h2 className={styles.sectionTitle}>Everything you need to trade smarter</h2>
+            <p className={styles.sectionSubtitle}>
+              A complete algorithmic trading toolkit built for everyone, from first-time traders to funds.
+            </p>
+          </div>
 
-        <div className={styles.featuresGrid}>
-          {features.map((feature, i) => (
-            <div className={styles.featureCard} key={i}>
-              <div className={styles.featureIcon}>{feature.icon}</div>
-              <h3 className={styles.featureTitle}>{feature.title}</h3>
-              <p className={styles.featureDescription}>
-                {feature.description}
-              </p>
-            </div>
-          ))}
+          <div className={styles.featuresGrid}>
+            {features.map((f, i) => (
+              <div className={styles.featureCard} key={i}>
+                <div className={styles.featureIconWrap}>{f.icon}</div>
+                <h3 className={styles.featureTitle}>{f.title}</h3>
+                <p className={styles.featureDescription}>{f.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* How It Works */}
       <section className={styles.howItWorks}>
-        <div className={styles.featuresHeader}>
-          <p className={styles.featuresLabel}>How It Works</p>
-          <h2 className={styles.featuresTitle}>
-            From Zero to Trading in Minutes
-          </h2>
-          <p className={styles.featuresSubtitle}>
-            No coding required. No complex setups. Just pick, tune, test, and
-            learn.
-          </p>
-        </div>
+        <div className="page-container">
+          <div className={styles.sectionHeader}>
+            <p className={styles.sectionLabel}>How it works</p>
+            <h2 className={styles.sectionTitle}>From zero to trading in minutes</h2>
+            <p className={styles.sectionSubtitle}>
+              No coding required. Pick a strategy, tune it, and start testing.
+            </p>
+          </div>
 
-        <div className={styles.stepsGrid}>
-          {steps.map((step, i) => (
-            <div className={styles.step} key={i}>
-              {i < steps.length - 1 && (
-                <div className={styles.stepConnector} />
-              )}
-              <div className={styles.stepNumber}>{i + 1}</div>
-              <h3 className={styles.stepTitle}>{step.title}</h3>
-              <p className={styles.stepDescription}>{step.description}</p>
-            </div>
-          ))}
+          <div className={styles.stepsGrid}>
+            {steps.map((step, i) => (
+              <div className={styles.step} key={i}>
+                {i < steps.length - 1 && <div className={styles.stepConnector} />}
+                <p className={styles.stepNumber}>{step.num}</p>
+                <h3 className={styles.stepTitle}>{step.title}</h3>
+                <p className={styles.stepDescription}>{step.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* CTA */}
       <section className={styles.cta}>
-        <div className={styles.ctaGlow} />
-        <div className={styles.ctaContent}>
-          <h2 className={styles.ctaTitle}>
-            Ready to Trade <span className="gradient-text">Smarter</span>?
-          </h2>
-          <p className={styles.ctaDescription}>
-            Start backtesting strategies for free. No wallet required for
-            simulation mode.
-          </p>
-          <div className={styles.heroActions} style={{ justifyContent: "center" }}>
-            <Link href="/simulate" className="btn btn-primary btn-lg">
-              Start Simulating Free
-            </Link>
-          </div>
+        <h2 className={styles.ctaTitle}>Start trading smarter today.</h2>
+        <p className={styles.ctaDescription}>
+          No wallet required for simulation. Free forever with no hidden fees.
+        </p>
+        <div className={styles.ctaActions}>
+          <Link href="/register" className="btn btn-primary btn-lg">
+            Create Free Account
+          </Link>
+          <Link href="/pricing" className="btn btn-secondary btn-lg">
+            View Pricing
+          </Link>
         </div>
       </section>
 
@@ -197,25 +204,16 @@ export default function Home() {
       <footer className={styles.footer}>
         <div className={styles.footerContent}>
           <p className={styles.footerText}>
-            © 2026 HeliumTrader. Built on Sui. Powered by AI.
+            &copy; 2026 HeliumTrader. Built on Sui.
           </p>
           <div className={styles.footerLinks}>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.footerLink}
-            >
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className={styles.footerLink}>
               GitHub
             </a>
-            <a
-              href="https://sui.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.footerLink}
-            >
+            <a href="https://sui.io" target="_blank" rel="noopener noreferrer" className={styles.footerLink}>
               Sui Network
             </a>
+            <Link href="/pricing" className={styles.footerLink}>Pricing</Link>
           </div>
         </div>
       </footer>

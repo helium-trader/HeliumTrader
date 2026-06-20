@@ -1,0 +1,385 @@
+.page {
+  min-height: 100vh;
+  padding-top: var(--nav-height);
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Page Header ── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.pageSubtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+
+.headerBadge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-primary);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* ── Stats Row ── */
+.statsRow {
+  display: flex;
+  gap: 1px;
+  background: var(--border-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+}
+
+.mainStat {
+  flex: 1;
+  background: var(--bg-card);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mainStatLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+}
+
+.mainStatValue {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.15;
+}
+
+.mainStatChange {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.subStats {
+  display: flex;
+  gap: 1px;
+  background: var(--border-primary);
+}
+
+.subStat {
+  background: var(--bg-card);
+  padding: 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 110px;
+}
+
+.subStatLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.subStatValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+}
+
+/* ── Equity Curve Card ── */
+.equityCard {
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+.equityCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.equityCardTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.equityCardPeriod {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.equityCardBody {
+  height: 160px;
+  padding: 0 2px 2px;
+}
+
+.equitySvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Allocation ── */
+.allocationCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+}
+
+.sectionLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+}
+
+.allocationBar {
+  display: flex;
+  height: 6px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  gap: 2px;
+}
+
+.allocationSegment {
+  border-radius: var(--radius-full);
+  /* background set per-symbol via inline style */
+  flex-shrink: 0;
+}
+
+/* set per-symbol colors via inline style on the parent,
+   but we need a fallback background */
+.allocationSegment:nth-child(1) { background: #4da2ff; }
+.allocationSegment:nth-child(2) { background: #f7931a; }
+.allocationSegment:nth-child(3) { background: #627eea; }
+.allocationSegment:nth-child(4) { background: #9945ff; }
+.allocationSegment:nth-child(5) { background: #c2a633; }
+
+.allocationLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendSymbol {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.legendPct {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Tab Bar ── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.tabBtn {
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+  margin-bottom: -1px;
+}
+
+.tabBtn:hover { color: var(--text-secondary); }
+
+.tabBtnActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
+/* ── Table ── */
+.tableCard {
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.table th {
+  padding: 10px 16px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-primary);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td { border-bottom: none; }
+
+.table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+.right { text-align: right; }
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+}
+
+.profit { color: var(--color-profit) !important; }
+.loss   { color: var(--color-loss)   !important; }
+
+/* Asset cell */
+.assetCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assetIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.assetSymbol {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+}
+
+.assetName {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+}
+
+/* P&L cell */
+.pnlCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.pnlPct {
+  font-size: 0.6875rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Allocation mini bar */
+.allocCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.allocMini {
+  width: 48px;
+  height: 2px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.allocMiniFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+}
+
+/* Type badge */
+.typeBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dateCell {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .statsRow { flex-direction: column; }
+  .subStats { overflow-x: auto; }
+}

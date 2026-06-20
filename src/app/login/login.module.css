@@ -1,0 +1,145 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--nav-height) + 32px) 24px 48px;
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.header {
+  margin-bottom: 32px;
+}
+
+.logoMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-lg);
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.input {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+.input:focus {
+  border-color: rgba(255,255,255,0.2) !important;
+  box-shadow: none !important;
+}
+
+.forgotLink {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  transition: color var(--transition-fast);
+}
+
+.forgotLink:hover { color: var(--text-primary); }
+
+.error {
+  font-size: 0.8125rem;
+  color: var(--color-loss);
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+}
+
+.submitBtn {
+  width: 100%;
+  padding: 10px;
+  font-size: 0.9375rem;
+  margin-top: 4px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(0,0,0,0.3);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: var(--border-primary);
+}
+
+.dividerText {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.switchText {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+}
+
+.switchLink {
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.switchLink:hover { color: var(--text-secondary); }
