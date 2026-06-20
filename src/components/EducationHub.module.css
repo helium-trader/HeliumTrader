@@ -1,0 +1,358 @@
+.hub {
+  margin-bottom: 64px;
+}
+
+.hubHeader {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-hover);
+  margin-bottom: 12px;
+}
+
+.hubTitle {
+  font-size: clamp(1.375rem, 3vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 10px;
+  text-wrap: balance;
+}
+
+.hubSub {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 600px;
+}
+
+/* Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+}
+
+/* Chart card */
+.chartCard {
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chartHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.chartTitle {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin-bottom: 2px;
+}
+
+.chartTagline {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ctrlBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.ctrlBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.speeds {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+}
+
+.speedBtn {
+  padding: 0 9px;
+  height: 30px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.speedBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.speedActive {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.speedActive:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Chart body */
+.chartBody {
+  position: relative;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.candle {
+  cursor: crosshair;
+  animation: candleIn 0.18s ease-out;
+}
+
+@keyframes candleIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+}
+
+.tipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tipRow > span:first-child {
+  color: var(--text-tertiary);
+}
+
+/* Legend */
+.legend {
+  position: absolute;
+  bottom: 6px;
+  left: 10px;
+  display: flex;
+  gap: 14px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+}
+
+.legendItem i {
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+}
+
+/* Progress */
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-card-hover);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.15s linear;
+}
+
+.barCount {
+  font-size: 0.6875rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* Side panel */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.lessonList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lessonBtn {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  text-align: left;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: transparent;
+  transition: all var(--transition-fast);
+}
+
+.lessonBtn:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.lessonActive {
+  border-color: var(--accent-primary);
+  background: var(--accent-subtle, rgba(59, 130, 246, 0.08));
+}
+
+.lessonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-card-hover);
+  color: var(--text-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.lessonActive .lessonIcon {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.lessonName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.lessonActive .lessonName {
+  color: var(--text-primary);
+}
+
+/* Lesson content */
+.lessonContent {
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  padding: 16px;
+  animation: contentIn 0.25s ease-out;
+}
+
+@keyframes contentIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lessonBody {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.takeaways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.takeaway {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 9px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-full);
+  background: var(--bg-card-hover);
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .side {
+    flex-direction: column;
+  }
+  .lessonList {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .lessonList {
+    grid-template-columns: 1fr;
+  }
+  .chartHead {
+    flex-direction: column;
+    gap: 10px;
+  }
+}

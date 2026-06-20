@@ -69,11 +69,6 @@ function formatTime() {
   return new Date().toLocaleTimeString("en-US", { hour12: false });
 }
 
-function randomPnl(profit: boolean) {
-  const val = (Math.random() * 3.5 + 0.2).toFixed(2);
-  return profit ? `+${val}%` : `-${val}%`;
-}
-
 export default function DashboardPage() {
   const [mode, setMode] = useState<Mode>("simulate");
   const [strategy, setStrategy] = useState<Strategy>("sma_crossover");
@@ -83,6 +78,7 @@ export default function DashboardPage() {
   const [progress, setProgress] = useState(0);
   const [simDone, setSimDone] = useState(false);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [allPnls, setAllPnls] = useState<number[]>([]);
   const [tvSymbol, setTvSymbol] = useState("BINANCE:SUIUSDT");
   const [pairLabel, setPairLabel] = useState("SUI / USDT");
   const [livePrice, setLivePrice] = useState(3.847);
@@ -124,6 +120,7 @@ export default function DashboardPage() {
     setSimDone(false);
     setProgress(0);
     setTrades([]);
+    setAllPnls([]);
 
     const totalSteps = 20;
     let step = 0;
@@ -134,16 +131,18 @@ export default function DashboardPage() {
 
       if (step % 3 === 0) {
         const isProfit = Math.random() < winRate / 100;
+        const pnlValue = parseFloat((Math.random() * 3.5 + 0.2).toFixed(2)) * (isProfit ? 1 : -1);
         const newTrade: Trade = {
           id: tradeIdRef.current++,
           type: Math.random() > 0.5 ? "BUY" : "SELL",
           pair: "SUI/USDC",
           time: formatTime(),
-          pnl: randomPnl(isProfit),
+          pnl: `${pnlValue >= 0 ? "+" : ""}${pnlValue.toFixed(2)}%`,
           profit: isProfit,
           price: `$${(livePrice + (Math.random() - 0.5) * 0.2).toFixed(3)}`,
         };
         setTrades((prev) => [newTrade, ...prev].slice(0, 12));
+        setAllPnls((prev) => [...prev, pnlValue]);
         setTotalTrades((t) => t + 1);
         setPortfolio((p) => {
           const delta = isProfit
@@ -173,6 +172,7 @@ export default function DashboardPage() {
     setParams(defaultParams);
     setSimDone(false);
     setTrades([]);
+    setAllPnls([]);
     setProgress(0);
   };
 
@@ -199,6 +199,38 @@ export default function DashboardPage() {
   const eqPath = "M" + eqPoints.join(" L");
   const portfolioChange = ((portfolio - 10000) / 10000 * 100).toFixed(2);
   const portfolioUp = portfolio >= 10000;
+
+  // Performance metrics derived from completed trades + equity curve
+  const metrics = useMemo(() => {
+    const wins = allPnls.filter((p) => p > 0);
+    const losses = allPnls.filter((p) => p < 0);
+    const grossProfit = wins.reduce((a, b) => a + b, 0);
+    const grossLoss = Math.abs(losses.reduce((a, b) => a + b, 0));
+
+    // Max drawdown from the equity curve (peak-to-trough)
+    let peak = equityCurve[0] ?? 10000;
+    let maxDd = 0;
+    for (const v of equityCurve) {
+      if (v > peak) peak = v;
+      const dd = (peak - v) / peak;
+      if (dd > maxDd) maxDd = dd;
+    }
+
+    const avgWin = wins.length ? grossProfit / wins.length : 0;
+    const avgLoss = losses.length ? grossLoss / losses.length : 0;
+
+    return {
+      netReturn: parseFloat(portfolioChange),
+      maxDrawdown: maxDd * 100,
+      profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
+      winningTrades: wins.length,
+      losingTrades: losses.length,
+      avgWin,
+      avgLoss,
+      bestTrade: allPnls.length ? Math.max(...allPnls) : 0,
+      worstTrade: allPnls.length ? Math.min(...allPnls) : 0,
+    };
+  }, [allPnls, equityCurve, portfolioChange]);
 
   useEffect(() => {
     if (historyRef.current) historyRef.current.scrollTop = 0;
@@ -325,6 +357,58 @@ export default function DashboardPage() {
                     <path d={`${eqPath} L${eqW},${eqH} L0,${eqH} Z`} fill="url(#eq-grad)" />
                     <path d={eqPath} fill="none" stroke={portfolioUp ? "#22c55e" : "#ef4444"} strokeWidth="1.5" />
                   </svg>
+                </div>
+              </div>
+            )}
+
+            {/* Performance Metrics */}
+            {simDone && allPnls.length > 0 && (
+              <div className={styles.metricsPanel}>
+                <div className={styles.metricsHeader}>
+                  <span className={styles.metricsTitle}>Performance Metrics</span>
+                  <span className="badge badge-accent">{strategyLabels[strategy]}</span>
+                </div>
+                <div className={styles.metricsGrid}>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Net Return</span>
+                    <span className={`${styles.metricValue} ${metrics.netReturn >= 0 ? "profit" : "loss"}`}>
+                      {metrics.netReturn >= 0 ? "+" : ""}{metrics.netReturn.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Max Drawdown</span>
+                    <span className={`${styles.metricValue} loss`}>-{metrics.maxDrawdown.toFixed(2)}%</span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Profit Factor</span>
+                    <span className={`${styles.metricValue} ${metrics.profitFactor >= 1 ? "profit" : "loss"}`}>
+                      {metrics.profitFactor === Infinity ? "∞" : metrics.profitFactor.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Win / Loss</span>
+                    <span className={styles.metricValue}>
+                      <span className="profit">{metrics.winningTrades}W</span>
+                      {" / "}
+                      <span className="loss">{metrics.losingTrades}L</span>
+                    </span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Avg Win</span>
+                    <span className={`${styles.metricValue} profit`}>+{metrics.avgWin.toFixed(2)}%</span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Avg Loss</span>
+                    <span className={`${styles.metricValue} loss`}>-{metrics.avgLoss.toFixed(2)}%</span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Best Trade</span>
+                    <span className={`${styles.metricValue} profit`}>+{metrics.bestTrade.toFixed(2)}%</span>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <span className={styles.metricLabel}>Worst Trade</span>
+                    <span className={`${styles.metricValue} loss`}>{metrics.worstTrade.toFixed(2)}%</span>
+                  </div>
                 </div>
               </div>
             )}

@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import EducationHub from "@/components/EducationHub";
 import styles from "./education.module.css";
 
 interface Algorithm {
@@ -127,6 +128,9 @@ export default function EducationPage() {
             what each one does, when it works best, and the parameters that shape it.
           </p>
         </header>
+
+        {/* Interactive hub */}
+        <EducationHub />
 
         {/* Quick nav */}
         <nav className={styles.quickNav} aria-label="Jump to algorithm">
