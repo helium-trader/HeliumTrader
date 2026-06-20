@@ -8,6 +8,7 @@ import styles from "./Navbar.module.css";
 
 const publicLinks = [
   { href: "/", label: "Home" },
+  { href: "/education", label: "Education" },
   { href: "/pricing", label: "Pricing" },
 ];
 
@@ -16,6 +17,7 @@ const authLinks = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/simulate", label: "Simulate" },
   { href: "/reports", label: "Reports" },
+  { href: "/education", label: "Education" },
   { href: "/pricing", label: "Pricing" },
 ];
 
@@ -152,6 +154,13 @@ export default function Navbar() {
                       <path d="M5 5H9M5 8H9M5 11H7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                     </svg>
                     Reports
+                  </Link>
+                  <Link href="/education" className={styles.dropdownItem} onClick={() => setDropdownOpen(false)}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <path d="M7 1L13 4L7 7L1 4L7 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                      <path d="M3.5 5.2V9C3.5 9 5 10.5 7 10.5C9 10.5 10.5 9 10.5 9V5.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Education
                   </Link>
                   <div className={styles.dropdownDivider} />
                   <button className={styles.dropdownLogout} onClick={handleLogout}>

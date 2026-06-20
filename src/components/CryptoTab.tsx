@@ -27,7 +27,11 @@ const defaultWatchlist: CryptoResult[] = [
   { id: "sui", symbol: "SUI", name: "Sui", image: "", tvSymbol: "BINANCE:SUIUSDT", price: 0, change: 0 },
 ];
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`request failed: ${r.status}`);
+  return r.json();
+};
 
 function formatPrice(p: number) {
   if (p === 0) return "—";
@@ -65,14 +69,20 @@ export default function CryptoTab({ activeSymbol, onSelect }: CryptoTabProps) {
 
   // Debounce the search query (state only — SWR does the fetching)
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 350);
+    const t = setTimeout(() => setDebounced(query.trim()), 450);
     return () => clearTimeout(t);
   }, [query]);
 
-  const { data, isLoading } = useSWR<{ results: CryptoResult[] }>(
+  const { data, isLoading, error } = useSWR<{ results: CryptoResult[] }>(
     `/api/crypto${debounced ? `?q=${encodeURIComponent(debounced)}` : ""}`,
     fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 }
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+      keepPreviousData: true,
+      errorRetryCount: 4,
+      errorRetryInterval: 1500,
+    }
   );
 
   const results = data?.results ?? [];
@@ -190,6 +200,8 @@ export default function CryptoTab({ activeSymbol, onSelect }: CryptoTabProps) {
           <div className={styles.list}>
             {searchResults.map((coin) => renderRow(coin, watchSymbols.has(coin.tvSymbol)))}
           </div>
+        ) : error ? (
+          <p className={styles.empty}>Live prices are busy. Retrying…</p>
         ) : (
           <p className={styles.empty}>
             {debounced ? `No coins found for "${debounced}"` : "No market data available"}
