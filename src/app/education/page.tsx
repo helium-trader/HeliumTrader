@@ -209,7 +209,7 @@ export default function EducationPage() {
             Configure any of these strategies and backtest them against historical data — no risk, no capital required.
           </p>
           <div className={styles.ctaActions}>
-            <Link href="/simulate" className="btn btn-primary btn-lg">
+            <Link href="/dashboard" className="btn btn-primary btn-lg">
               Run a backtest
             </Link>
             <Link href="/dashboard" className="btn btn-secondary btn-lg">

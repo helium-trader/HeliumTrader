@@ -106,7 +106,7 @@ export default function Home() {
               <Link href="/register" className="btn btn-primary btn-lg">
                 Get Started Free
               </Link>
-              <Link href="/simulate" className="btn btn-secondary btn-lg">
+              <Link href="/dashboard" className="btn btn-secondary btn-lg">
                 Try Simulation
               </Link>
             </div>

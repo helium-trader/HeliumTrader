@@ -226,6 +226,26 @@
   color: var(--text-primary);
 }
 
+.newDataBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.newDataBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
 .chartBody {
   height: clamp(460px, 62vh, 640px);
   overflow: hidden;
@@ -264,6 +284,196 @@
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* ── Live Market Price Chart ── */
+.liveChartWrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.liveTag {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.livePeriodTag {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.priceMeta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.priceMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+}
+
+.priceMetaLabel {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.priceMetaValue {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.priceChartBody {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 2px 2px;
+}
+
+.priceAxis {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 16px 12px;
+  font-size: 0.6875rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 640px) {
+  .priceMeta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Live Market Sidebar Controls ── */
+.tickerInput {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+  transition: border-color var(--transition-fast);
+}
+
+.tickerInput::placeholder {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.tickerInput:hover,
+.tickerInput:focus {
+  border-color: var(--border-hover);
+  outline: none;
+}
+
+/* ── Strategy Switcher ── */
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.switchToggle {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.liveStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.liveSpinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: liveSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes liveSpin {
+  to { transform: rotate(360deg); }
+}
+
+.liveError {
+  font-size: 0.75rem;
+  color: var(--color-loss);
+  line-height: 1.5;
+  padding: 9px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.liveCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+}
+
+.liveCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.liveSymbol {
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.liveName {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.livePriceValue {
+  margin-top: 4px;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+  color: var(--color-profit);
 }
 
 /* ── Performance Metrics ── */

@@ -148,7 +148,7 @@ export default function ReportsPage() {
             <p className={styles.ctaText}>
               Run a simulation or paper trade to generate a new AI performance report.
             </p>
-            <Link href="/simulate" className="btn btn-primary btn-lg">
+            <Link href="/dashboard" className="btn btn-primary btn-lg">
               Run a simulation
             </Link>
           </section>

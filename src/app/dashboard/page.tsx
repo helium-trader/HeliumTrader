@@ -3,14 +3,42 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import TradingViewWidget from "@/components/TradingViewWidget";
+import SimulatedChart, { type Candle } from "@/components/SimulatedChart";
 import CryptoTab from "@/components/CryptoTab";
+import TickerSearch from "@/components/TickerSearch";
 import styles from "./dashboard.module.css";
 
 // --- Types ---
 type Strategy = "sma_crossover" | "rsi" | "bollinger" | "macd";
 type Mode = "simulate" | "paper";
-type SidebarTab = "params" | "crypto";
+type SidebarTab = "params" | "crypto" | "live";
+
+interface StockData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface LiveData {
+  symbol: string;
+  name: string;
+  currentPrice: number;
+  currency: string;
+  period: string;
+  data: StockData[];
+}
+
+const periodOptions: { value: string; label: string; short: string }[] = [
+  { value: "1mo", label: "1 Month", short: "1M" },
+  { value: "3mo", label: "3 Months", short: "3M" },
+  { value: "6mo", label: "6 Months", short: "6M" },
+  { value: "1y", label: "1 Year", short: "1Y" },
+  { value: "2y", label: "2 Years", short: "2Y" },
+  { value: "5y", label: "5 Years", short: "5Y" },
+];
 
 interface StrategyParams {
   sma_crossover: { fastPeriod: number; slowPeriod: number; stopLoss: number; takeProfit: number };
@@ -70,9 +98,13 @@ function formatTime() {
 }
 
 export default function DashboardPage() {
-  const [mode, setMode] = useState<Mode>("simulate");
+  const [mode] = useState<Mode>("simulate");
   const [strategy, setStrategy] = useState<Strategy>("sma_crossover");
   const [params, setParams] = useState(defaultParams);
+  // Strategy switcher: swap to a fallback strategy when price drops below threshold
+  const [switchEnabled, setSwitchEnabled] = useState(false);
+  const [switchThreshold, setSwitchThreshold] = useState(3.8);
+  const [switchStrategy, setSwitchStrategy] = useState<Strategy>("rsi");
   const [activeTimeframe, setActiveTimeframe] = useState("1H");
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -80,7 +112,7 @@ export default function DashboardPage() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [allPnls, setAllPnls] = useState<number[]>([]);
   const [tvSymbol, setTvSymbol] = useState("BINANCE:SUIUSDT");
-  const [pairLabel, setPairLabel] = useState("SUI / USDT");
+  const [pairLabel, setPairLabel] = useState("SIM / USD");
   const [livePrice, setLivePrice] = useState(3.847);
   const [priceDir, setPriceDir] = useState<"up" | "down" | null>(null);
   const [portfolio, setPortfolio] = useState(10247.83);
@@ -88,8 +120,56 @@ export default function DashboardPage() {
   const [totalTrades, setTotalTrades] = useState(127);
   const [sharpe, setSharpe] = useState(1.84);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("params");
+  const [chartSeed, setChartSeed] = useState(0);
   const tradeIdRef = useRef(200);
   const historyRef = useRef<HTMLDivElement>(null);
+
+  // Live Market state
+  const [ticker, setTicker] = useState("AAPL");
+  const [period, setPeriod] = useState("6mo");
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [liveData, setLiveData] = useState<LiveData | null>(null);
+  const [liveAlgo, setLiveAlgo] = useState(false);
+
+  const handleLoadData = useCallback(async (periodOverride?: string, symbolOverride?: string) => {
+    const symbol = (symbolOverride ?? ticker).trim().toUpperCase();
+    if (!symbol) {
+      setLiveError("Enter a ticker symbol.");
+      return;
+    }
+    const usePeriod = periodOverride ?? period;
+    if (periodOverride) setPeriod(periodOverride);
+    setLiveLoading(true);
+    setLiveError(null);
+    try {
+      const res = await fetch(
+        `/api/stock?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(usePeriod)}`
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error || "Failed to load data.");
+      }
+      setLiveData(json as LiveData);
+    } catch (err) {
+      setLiveError((err as Error).message);
+    } finally {
+      setLiveLoading(false);
+    }
+  }, [ticker, period]);
+
+  // Convert real OHLCV market data into candle format for the chart
+  const liveCandles = useMemo<Candle[] | undefined>(() => {
+    if (!liveData) return undefined;
+    return liveData.data.map((d) => ({
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+      volume: d.volume,
+      t: new Date(d.time).getTime(),
+    }));
+  }, [liveData]);
 
   const equityCurve = useMemo(() => generateEquityCurve(40, winRate / 100), [simDone, strategy]);
 
@@ -135,7 +215,7 @@ export default function DashboardPage() {
         const newTrade: Trade = {
           id: tradeIdRef.current++,
           type: Math.random() > 0.5 ? "BUY" : "SELL",
-          pair: "SUI/USDC",
+          pair: "SIM/USD",
           time: formatTime(),
           pnl: `${pnlValue >= 0 ? "+" : ""}${pnlValue.toFixed(2)}%`,
           profit: isProfit,
@@ -200,6 +280,10 @@ export default function DashboardPage() {
   const portfolioChange = ((portfolio - 10000) / 10000 * 100).toFixed(2);
   const portfolioUp = portfolio >= 10000;
 
+  // Live market price chart
+  const fmtPrice = (v: number, currency: string) =>
+    `${currency === "USD" ? "$" : ""}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency !== "USD" ? ` ${currency}` : ""}`;
+
   // Performance metrics derived from completed trades + equity curve
   const metrics = useMemo(() => {
     const wins = allPnls.filter((p) => p > 0);
@@ -250,20 +334,6 @@ export default function DashboardPage() {
                 Live
               </span>
             </div>
-            <div className={styles.dashboardMode}>
-              <button
-                className={`${styles.modeBtn} ${mode === "simulate" ? styles.modeBtnActive : ""}`}
-                onClick={() => setMode("simulate")}
-              >
-                Simulate
-              </button>
-              <button
-                className={`${styles.modeBtn} ${mode === "paper" ? styles.modeBtnActive : ""}`}
-                onClick={() => setMode("paper")}
-              >
-                Paper Trade
-              </button>
-            </div>
           </div>
         </div>
 
@@ -297,48 +367,132 @@ export default function DashboardPage() {
           <div className={styles.chartColumn}>
             <div className={styles.chartPanel}>
               <div className={styles.chartHeader}>
-                <div className={styles.chartPair}>
-                  <span
-                    className={`${styles.chartPairPrice} ${
-                      priceDir === "up" ? styles.priceUp : priceDir === "down" ? styles.priceDown : ""
-                    }`}
-                  >
-                    {pairLabel} &nbsp;
-                    ${livePrice.toFixed(3)}
-                  </span>
-                  <span className={`badge ${priceDir === "down" ? "badge-loss" : "badge-profit"}`}>
-                    {priceDir === "down" ? "-" : "+"}0.16%
-                  </span>
-                </div>
-                <div className={styles.chartTimeframes}>
-                  {timeframes.map((tf) => (
-                    <button
-                      key={tf}
-                      className={`${styles.timeframeBtn} ${tf === activeTimeframe ? styles.timeframeBtnActive : ""}`}
-                      onClick={() => setActiveTimeframe(tf)}
-                    >
-                      {tf}
-                    </button>
-                  ))}
-                </div>
+                {liveData ? (
+                  <>
+                    <div className={styles.chartPair}>
+                      <span className={styles.chartPairPrice}>
+                        {liveData.symbol} &nbsp;
+                        {fmtPrice(liveData.currentPrice, liveData.currency)}
+                      </span>
+                      {(() => {
+                        const first = liveData.data[0]?.close ?? 0;
+                        const last = liveData.data[liveData.data.length - 1]?.close ?? 0;
+                        const chg = first ? ((last - first) / first) * 100 : 0;
+                        return (
+                          <span className={`badge ${chg >= 0 ? "badge-profit" : "badge-loss"}`}>
+                            {chg >= 0 ? "+" : ""}{chg.toFixed(2)}%
+                          </span>
+                        );
+                      })()}
+                      <span className={styles.liveTag}>{liveData.name}</span>
+                    </div>
+                    <div className={styles.chartTimeframes}>
+                      {periodOptions.map((p) => (
+                        <button
+                          key={p.value}
+                          className={`${styles.timeframeBtn} ${p.value === period ? styles.timeframeBtnActive : ""}`}
+                          onClick={() => handleLoadData(p.value)}
+                          disabled={liveLoading}
+                          title={p.label}
+                        >
+                          {p.short}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.chartPair}>
+                      <span
+                        className={`${styles.chartPairPrice} ${
+                          priceDir === "up" ? styles.priceUp : priceDir === "down" ? styles.priceDown : ""
+                        }`}
+                      >
+                        {pairLabel} &nbsp;
+                        ${livePrice.toFixed(3)}
+                      </span>
+                      <span className={`badge ${priceDir === "down" ? "badge-loss" : "badge-profit"}`}>
+                        {priceDir === "down" ? "-" : "+"}0.16%
+                      </span>
+                    </div>
+                    <div className={styles.chartTimeframes}>
+                      {timeframes.map((tf) => (
+                        <button
+                          key={tf}
+                          className={`${styles.timeframeBtn} ${tf === activeTimeframe ? styles.timeframeBtnActive : ""}`}
+                          onClick={() => setActiveTimeframe(tf)}
+                        >
+                          {tf}
+                        </button>
+                      ))}
+                      <button
+                        className={styles.newDataBtn}
+                        onClick={() => setChartSeed((s) => s + 1)}
+                        title="Generate a new set of simulated data"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                          <path d="M12 7a5 5 0 1 1-1.46-3.54" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                          <path d="M12 2v3h-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        New Data
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               <div className={styles.chartBody}>
-                <TradingViewWidget
-                  symbol={tvSymbol}
-                  interval={
-                    activeTimeframe === "1m" ? "1" :
-                    activeTimeframe === "5m" ? "5" :
-                    activeTimeframe === "15m" ? "15" :
-                    activeTimeframe === "1H" ? "60" :
-                    activeTimeframe === "4H" ? "240" : "D"
-                  }
-                  theme="dark"
-                />
+                {liveData ? (
+                  <div className={styles.liveChartWrap}>
+                    <div className={styles.priceMeta}>
+                      <div className={styles.priceMetaItem}>
+                        <span className={styles.priceMetaLabel}>Last</span>
+                        <span className={styles.priceMetaValue}>{fmtPrice(liveData.currentPrice, liveData.currency)}</span>
+                      </div>
+                      <div className={styles.priceMetaItem}>
+                        <span className={styles.priceMetaLabel}>High</span>
+                        <span className={styles.priceMetaValue}>{fmtPrice(Math.max(...liveData.data.map((d) => d.high)), liveData.currency)}</span>
+                      </div>
+                      <div className={styles.priceMetaItem}>
+                        <span className={styles.priceMetaLabel}>Low</span>
+                        <span className={styles.priceMetaValue}>{fmtPrice(Math.min(...liveData.data.map((d) => d.low)), liveData.currency)}</span>
+                      </div>
+                      <div className={styles.priceMetaItem}>
+                        <span className={styles.priceMetaLabel}>Candles</span>
+                        <span className={styles.priceMetaValue}>{liveData.data.length}</span>
+                      </div>
+                    </div>
+                    <div className={styles.priceChartBody}>
+                      <SimulatedChart
+                        timeframe="1D"
+                        staticCandles={liveCandles}
+                        strategy={strategy}
+                        showAlgo={liveAlgo}
+                        params={currentParams as unknown as Record<string, number>}
+                        switchEnabled={switchEnabled}
+                        switchThreshold={switchThreshold}
+                        switchStrategy={switchStrategy}
+                        ariaLabel={`${liveData.symbol} candlestick chart`}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <SimulatedChart
+                    timeframe={activeTimeframe}
+                    basePrice={livePrice}
+                    regenKey={chartSeed}
+                    strategy={strategy}
+                    showAlgo={running || simDone}
+                    params={currentParams as unknown as Record<string, number>}
+                    switchEnabled={switchEnabled}
+                    switchThreshold={switchThreshold}
+                    switchStrategy={switchStrategy}
+                  />
+                )}
               </div>
             </div>
 
             {/* Equity Curve */}
-            {(simDone || trades.length > 0) && (
+            {!liveData && (simDone || trades.length > 0) && (
               <div className={styles.equityPanel}>
                 <div className={styles.equityHeader}>
                   <span className={styles.equityTitle}>Equity Curve</span>
@@ -362,7 +516,7 @@ export default function DashboardPage() {
             )}
 
             {/* Performance Metrics */}
-            {simDone && allPnls.length > 0 && (
+            {!liveData && simDone && allPnls.length > 0 && (
               <div className={styles.metricsPanel}>
                 <div className={styles.metricsHeader}>
                   <span className={styles.metricsTitle}>Performance Metrics</span>
@@ -414,6 +568,7 @@ export default function DashboardPage() {
             )}
 
             {/* Recent Trades */}
+            {!liveData && (
             <div className={styles.historyPanel}>
               <div className={styles.historyHeader}>
                 <span className={styles.historyTitle}>Recent Trades</span>
@@ -448,6 +603,7 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+            )}
           </div>
 
           {/* Sidebar — 25% */}
@@ -456,15 +612,24 @@ export default function DashboardPage() {
             <div className={styles.sidebarTabs}>
               <button
                 className={`${styles.sidebarTab} ${sidebarTab === "params" ? styles.sidebarTabActive : ""}`}
-                onClick={() => setSidebarTab("params")}
+                onClick={() => {
+                  setSidebarTab("params");
+                  setLiveData(null);
+                }}
               >
-                Parameters
+                Simulation
               </button>
               <button
                 className={`${styles.sidebarTab} ${sidebarTab === "crypto" ? styles.sidebarTabActive : ""}`}
                 onClick={() => setSidebarTab("crypto")}
               >
                 Crypto
+              </button>
+              <button
+                className={`${styles.sidebarTab} ${sidebarTab === "live" ? styles.sidebarTabActive : ""}`}
+                onClick={() => setSidebarTab("live")}
+              >
+                Live Market
               </button>
             </div>
 
@@ -478,7 +643,13 @@ export default function DashboardPage() {
                     className={styles.strategySelect}
                     value={strategy}
                     onChange={(e) => {
-                      setStrategy(e.target.value as Strategy);
+                      const next = e.target.value as Strategy;
+                      setStrategy(next);
+                      // Keep the fallback strategy distinct from the primary
+                      if (switchStrategy === next) {
+                        const alt = (Object.keys(strategyLabels) as Strategy[]).find((k) => k !== next);
+                        if (alt) setSwitchStrategy(alt);
+                      }
                       setSimDone(false);
                       setTrades([]);
                     }}
@@ -612,6 +783,59 @@ export default function DashboardPage() {
                     onChange={(e) => updateParam("takeProfit", +e.target.value)} />
                 </div>
 
+                <div className={styles.paramDivider} />
+
+                {/* Strategy Switcher */}
+                <div className={styles.paramGroup}>
+                  <label className={styles.switchRow}>
+                    <span className={styles.paramLabel} style={{ margin: 0 }}>Strategy Switcher</span>
+                    <input
+                      type="checkbox"
+                      className={styles.switchToggle}
+                      checked={switchEnabled}
+                      onChange={(e) => setSwitchEnabled(e.target.checked)}
+                    />
+                  </label>
+                  <p className={styles.strategyDesc}>
+                    Swap to a fallback strategy when price drops below a set threshold.
+                  </p>
+                </div>
+
+                {switchEnabled && (
+                  <>
+                    <div className={styles.paramGroup}>
+                      <label className={styles.paramLabel} htmlFor="switchThreshold">
+                        Threshold Price
+                      </label>
+                      <input
+                        id="switchThreshold"
+                        type="number"
+                        step="0.01"
+                        className={styles.tickerInput}
+                        value={switchThreshold}
+                        onChange={(e) => setSwitchThreshold(+e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.paramGroup}>
+                      <label className={styles.paramLabel}>Fallback Strategy</label>
+                      <select
+                        className={styles.strategySelect}
+                        value={switchStrategy}
+                        onChange={(e) => setSwitchStrategy(e.target.value as Strategy)}
+                      >
+                        {Object.entries(strategyLabels)
+                          .filter(([key]) => key !== strategy)
+                          .map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                      </select>
+                      <p className={styles.strategyDesc}>
+                        Below {switchThreshold}, the chart uses {strategyLabels[switchStrategy]} instead of {strategyLabels[strategy]}.
+                      </p>
+                    </div>
+                  </>
+                )}
+
                 {running && (
                   <div className={styles.progressGroup}>
                     <div className={styles.progressLabel}>
@@ -660,12 +884,6 @@ export default function DashboardPage() {
                 <div className={styles.paramDivider} />
 
                 <div className={styles.quickLinks}>
-                  <Link href="/simulate" className={styles.quickLink}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                      <path d="M2 9L5 6L8 8L12 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Full Backtest
-                  </Link>
                   <Link href="/reports" className={styles.quickLink}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                       <rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
@@ -674,6 +892,96 @@ export default function DashboardPage() {
                     AI Report
                   </Link>
                 </div>
+              </div>
+            )}
+
+            {/* Live Market Tab */}
+            {sidebarTab === "live" && (
+              <div className={styles.sidebarContent}>
+                <p className={styles.cryptoHint}>
+                  Load real historical market data for any stock ticker.
+                </p>
+
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel} htmlFor="ticker">Ticker symbol</label>
+                  <TickerSearch
+                    value={ticker}
+                    onChange={setTicker}
+                    onSelect={(symbol) => {
+                      setTicker(symbol);
+                      handleLoadData(undefined, symbol);
+                    }}
+                    disabled={liveLoading}
+                  />
+                </div>
+
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel} htmlFor="period">Time period</label>
+                  <select
+                    id="period"
+                    className={styles.strategySelect}
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                  >
+                    {periodOptions.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  className={`btn btn-primary ${liveLoading ? styles.btnRunning : ""}`}
+                  style={{ width: "100%" }}
+                  onClick={() => handleLoadData()}
+                  disabled={liveLoading}
+                >
+                  {liveLoading ? "Loading…" : "Load Data"}
+                </button>
+
+                {liveLoading && (
+                  <div className={styles.liveStatus}>
+                    <div className={styles.liveSpinner} />
+                    <span>Fetching market data…</span>
+                  </div>
+                )}
+
+                {liveError && !liveLoading && (
+                  <div className={styles.liveError}>{liveError}</div>
+                )}
+
+                {liveData && !liveLoading && (
+                  <>
+                    <div className={styles.paramDivider} />
+
+                    <div className={styles.paramGroup}>
+                      <label className={styles.paramLabel}>Trading strategy</label>
+                      <select
+                        className={styles.strategySelect}
+                        value={strategy}
+                        onChange={(e) => setStrategy(e.target.value as Strategy)}
+                      >
+                        {Object.entries(strategyLabels).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <p className={styles.strategyDesc}>{strategyDescriptions[strategy]}</p>
+                    </div>
+
+                    <button
+                      className="btn btn-primary"
+                      style={{ width: "100%" }}
+                      onClick={() => setLiveAlgo((v) => !v)}
+                    >
+                      {liveAlgo ? "Hide Strategy Overlay" : "Run Strategy on Chart"}
+                    </button>
+
+                    {liveAlgo && (
+                      <div className={styles.simResult}>
+                        {strategyLabels[strategy]} applied to {liveData.symbol}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
