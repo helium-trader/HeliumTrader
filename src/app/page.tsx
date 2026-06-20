@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import EducationHub from "@/components/EducationHub";
+import HowItWorksJourney from "@/components/HowItWorksJourney";
 import styles from "./page.module.css";
 
 const features = [
@@ -68,13 +68,6 @@ const features = [
       </svg>
     ),
   },
-];
-
-const steps = [
-  { num: "01", title: "Choose a Strategy", description: "Select from SMA Crossover, RSI, Bollinger Bands, or MACD." },
-  { num: "02", title: "Tune Parameters", description: "Adjust periods, thresholds, stop-loss and take-profit with intuitive controls." },
-  { num: "03", title: "Simulate & Test", description: "Backtest against historical data or paper trade live on Sui DeepBook." },
-  { num: "04", title: "Get AI Insights", description: "Receive AI reports with performance analysis and optimization suggestions." },
 ];
 
 export default function Home() {
@@ -156,35 +149,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Interactive Education Hub */}
+      {/* How It Works — cinematic journey */}
       <section className={styles.learn} id="learn">
-        <div className="page-container">
-          <EducationHub />
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className={styles.howItWorks}>
-        <div className="page-container">
-          <div className={styles.sectionHeader}>
-            <p className={styles.sectionLabel}>How it works</p>
-            <h2 className={styles.sectionTitle}>From zero to trading in minutes</h2>
-            <p className={styles.sectionSubtitle}>
-              No coding required. Pick a strategy, tune it, and start testing.
-            </p>
-          </div>
-
-          <div className={styles.stepsGrid}>
-            {steps.map((step, i) => (
-              <div className={styles.step} key={i}>
-                {i < steps.length - 1 && <div className={styles.stepConnector} />}
-                <p className={styles.stepNumber}>{step.num}</p>
-                <h3 className={styles.stepTitle}>{step.title}</h3>
-                <p className={styles.stepDescription}>{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <HowItWorksJourney />
       </section>
 
       {/* CTA */}
