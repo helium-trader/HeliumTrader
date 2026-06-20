@@ -26,6 +26,12 @@ interface SimulatedChartProps {
   staticCandles?: Candle[];
   /** Accessible label for the chart. */
   ariaLabel?: string;
+  /** Enable switching to a fallback strategy when price drops below a threshold. */
+  switchEnabled?: boolean;
+  /** Price level below which the fallback strategy takes over. */
+  switchThreshold?: number;
+  /** Fallback strategy id used when price is below the threshold. */
+  switchStrategy?: string;
 }
 
 const NUM_CANDLES = 64;
@@ -152,11 +158,86 @@ interface OverlayLine {
   color: string;
   width: number;
   dash?: string;
+  opacity?: number;
 }
 interface Marker {
   x: number;
   y: number;
   side: "buy" | "sell";
+}
+
+interface StrategyComputed {
+  lines: { values: (number | null)[]; color: string; width: number; dash?: string; opacity?: number }[];
+  signals: { i: number; side: "buy" | "sell" }[];
+  band: { upper: (number | null)[]; lower: (number | null)[] } | null;
+  legend: { label: string; color: string }[];
+}
+
+// Compute indicator lines, bands, and buy/sell signals for a single strategy.
+function computeStrategy(
+  strategy: string,
+  closes: number[],
+  params: Record<string, number>
+): StrategyComputed {
+  const lines: StrategyComputed["lines"] = [];
+  const signals: { i: number; side: "buy" | "sell" }[] = [];
+  let band: StrategyComputed["band"] = null;
+  let legend: { label: string; color: string }[] = [];
+
+  if (strategy === "sma_crossover" || strategy === "macd") {
+    const fastP = (params.fastPeriod ?? (strategy === "macd" ? 12 : 9)) | 0;
+    const slowP = (params.slowPeriod ?? (strategy === "macd" ? 26 : 21)) | 0;
+    const fast = strategy === "macd" ? ema(closes, fastP) : sma(closes, fastP);
+    const slow = strategy === "macd" ? ema(closes, slowP) : sma(closes, slowP);
+    lines.push({ values: fast, color: "#38bdf8", width: 2 });
+    lines.push({ values: slow, color: "#f59e0b", width: 2 });
+    legend = [
+      { label: `Fast (${fastP})`, color: "#38bdf8" },
+      { label: `Slow (${slowP})`, color: "#f59e0b" },
+    ];
+    for (let i = 1; i < closes.length; i++) {
+      const f0 = fast[i - 1];
+      const s0 = slow[i - 1];
+      const f1 = fast[i];
+      const s1 = slow[i];
+      if (f0 == null || s0 == null || f1 == null || s1 == null) continue;
+      if (f0 <= s0 && f1 > s1) signals.push({ i, side: "buy" });
+      else if (f0 >= s0 && f1 < s1) signals.push({ i, side: "sell" });
+    }
+  } else if (strategy === "bollinger") {
+    const period = (params.period ?? 20) | 0;
+    const mult = params.stdDev ?? 2;
+    const mid = sma(closes, period);
+    const std = rollingStd(closes, mid, period);
+    const upper = mid.map((m, i) => (m == null || std[i] == null ? null : m + mult * (std[i] as number)));
+    const lower = mid.map((m, i) => (m == null || std[i] == null ? null : m - mult * (std[i] as number)));
+    band = { upper, lower };
+    lines.push({ values: mid, color: "#f59e0b", width: 1.5, dash: "5 4" });
+    legend = [{ label: `Bands (${period}, ${mult}σ)`, color: "#38bdf8" }];
+    for (let i = 1; i < closes.length; i++) {
+      const lo = lower[i];
+      const up = upper[i];
+      if (lo == null || up == null) continue;
+      if (closes[i - 1] >= (lower[i - 1] ?? lo) && closes[i] < lo) signals.push({ i, side: "buy" });
+      else if (closes[i - 1] <= (upper[i - 1] ?? up) && closes[i] > up) signals.push({ i, side: "sell" });
+    }
+  } else if (strategy === "rsi") {
+    const period = (params.period ?? 14) | 0;
+    const oversold = params.oversold ?? 30;
+    const overbought = params.overbought ?? 70;
+    const r = rsiSeries(closes, period);
+    lines.push({ values: sma(closes, period), color: "#38bdf8", width: 1.5, dash: "5 4" });
+    legend = [{ label: `RSI (${period}) ${oversold}/${overbought}`, color: "#38bdf8" }];
+    for (let i = 1; i < r.length; i++) {
+      const r0 = r[i - 1];
+      const r1 = r[i];
+      if (r0 == null || r1 == null) continue;
+      if (r0 <= oversold && r1 > oversold) signals.push({ i, side: "buy" });
+      else if (r0 >= overbought && r1 < overbought) signals.push({ i, side: "sell" });
+    }
+  }
+
+  return { lines, signals, band, legend };
 }
 
 function SimulatedChart({
@@ -168,11 +249,14 @@ function SimulatedChart({
   params = {},
   staticCandles,
   ariaLabel = "Simulated price chart",
+  switchEnabled = false,
+  switchThreshold,
+  switchStrategy = "rsi",
 }: SimulatedChartProps) {
   const isStatic = !!staticCandles;
-  const [candles, setCandles] = useState<Candle[]>(
-    () => staticCandles ?? generateSeries(basePrice, timeframe)
-  );
+  // Start empty so the server and the client's first render match (the random
+  // series uses Math.random()/Date.now() and must only run on the client).
+  const [candles, setCandles] = useState<Candle[]>(() => staticCandles ?? []);
   const baseRef = useRef(basePrice);
 
   // Sync to externally provided candles (real market data)
@@ -180,7 +264,8 @@ function SimulatedChart({
     if (staticCandles) setCandles(staticCandles);
   }, [staticCandles]);
 
-  // Regenerate when the timeframe changes
+  // Generate the initial series (and regenerate when the timeframe changes)
+  // on the client only, after mount.
   useEffect(() => {
     if (isStatic) return;
     setCandles(generateSeries(baseRef.current, timeframe));
@@ -222,73 +307,65 @@ function SimulatedChart({
     return () => clearInterval(id);
   }, [timeframe, isStatic]);
 
-  // Compute strategy overlay (indicator lines, bands, and buy/sell markers)
+  // Compute strategy overlay (indicator lines, bands, and buy/sell markers).
+  // When the switcher is active, the fallback strategy takes over for any
+  // candle whose close is below the threshold.
   const algo = useMemo(() => {
     if (!showAlgo) return null;
     const closes = candles.map((c) => c.close);
-    const lines: { values: (number | null)[]; color: string; width: number; dash?: string }[] = [];
-    const signals: { i: number; side: "buy" | "sell" }[] = [];
-    let band: { upper: (number | null)[]; lower: (number | null)[] } | null = null;
-    let legend: { label: string; color: string }[] = [];
+    const primary = computeStrategy(strategy, closes, params);
 
-    if (strategy === "sma_crossover" || strategy === "macd") {
-      const fastP = (params.fastPeriod ?? (strategy === "macd" ? 12 : 9)) | 0;
-      const slowP = (params.slowPeriod ?? (strategy === "macd" ? 26 : 21)) | 0;
-      const fast = strategy === "macd" ? ema(closes, fastP) : sma(closes, fastP);
-      const slow = strategy === "macd" ? ema(closes, slowP) : sma(closes, slowP);
-      lines.push({ values: fast, color: "#38bdf8", width: 2 });
-      lines.push({ values: slow, color: "#f59e0b", width: 2 });
-      legend = [
-        { label: `Fast (${fastP})`, color: "#38bdf8" },
-        { label: `Slow (${slowP})`, color: "#f59e0b" },
-      ];
-      for (let i = 1; i < closes.length; i++) {
-        const f0 = fast[i - 1];
-        const s0 = slow[i - 1];
-        const f1 = fast[i];
-        const s1 = slow[i];
-        if (f0 == null || s0 == null || f1 == null || s1 == null) continue;
-        if (f0 <= s0 && f1 > s1) signals.push({ i, side: "buy" });
-        else if (f0 >= s0 && f1 < s1) signals.push({ i, side: "sell" });
-      }
-    } else if (strategy === "bollinger") {
-      const period = (params.period ?? 20) | 0;
-      const mult = params.stdDev ?? 2;
-      const mid = sma(closes, period);
-      const std = rollingStd(closes, mid, period);
-      const upper = mid.map((m, i) => (m == null || std[i] == null ? null : m + mult * (std[i] as number)));
-      const lower = mid.map((m, i) => (m == null || std[i] == null ? null : m - mult * (std[i] as number)));
-      band = { upper, lower };
-      lines.push({ values: mid, color: "#f59e0b", width: 1.5, dash: "5 4" });
-      legend = [{ label: `Bands (${period}, ${mult}σ)`, color: "#38bdf8" }];
-      for (let i = 1; i < closes.length; i++) {
-        const lo = lower[i];
-        const up = upper[i];
-        if (lo == null || up == null) continue;
-        if (closes[i - 1] >= (lower[i - 1] ?? lo) && closes[i] < lo) signals.push({ i, side: "buy" });
-        else if (closes[i - 1] <= (upper[i - 1] ?? up) && closes[i] > up) signals.push({ i, side: "sell" });
-      }
-    } else if (strategy === "rsi") {
-      const period = (params.period ?? 14) | 0;
-      const oversold = params.oversold ?? 30;
-      const overbought = params.overbought ?? 70;
-      const r = rsiSeries(closes, period);
-      // Reference line: SMA of price for visual trend context
-      lines.push({ values: sma(closes, period), color: "#38bdf8", width: 1.5, dash: "5 4" });
-      legend = [{ label: `RSI (${period}) ${oversold}/${overbought}`, color: "#38bdf8" }];
-      for (let i = 1; i < r.length; i++) {
-        const r0 = r[i - 1];
-        const r1 = r[i];
-        if (r0 == null || r1 == null) continue;
-        if (r0 <= oversold && r1 > oversold) signals.push({ i, side: "buy" });
-        else if (r0 >= overbought && r1 < overbought) signals.push({ i, side: "sell" });
-      }
+    const switchActive =
+      switchEnabled && switchThreshold != null && switchStrategy !== strategy;
+
+    if (!switchActive) {
+      return {
+        lines: primary.lines,
+        signals: primary.signals,
+        band: primary.band,
+        legend: primary.legend,
+        threshold: null as number | null,
+      };
     }
 
-    return { lines, signals, band, legend };
-  }, [showAlgo, strategy, params, candles]);
+    const secondary = computeStrategy(switchStrategy, closes, params);
+    const below = (i: number) => closes[i] < (switchThreshold as number);
+
+    // Active strategy at each candle decides which signals are valid.
+    const signals = [
+      ...primary.signals.filter((s) => !below(s.i)),
+      ...secondary.signals.filter((s) => below(s.i)),
+    ].sort((a, b) => a.i - b.i);
+
+    // Only draw each strategy's indicator lines where it is the active one:
+    // primary above the threshold, fallback below it. Inactive points become
+    // null so the line breaks instead of overlapping the other strategy.
+    const maskLine = (values: (number | null)[], showWhenBelow: boolean) =>
+      values.map((v, i) => (below(i) === showWhenBelow ? v : null));
+
+    const lines = [
+      ...primary.lines.map((l) => ({ ...l, values: maskLine(l.values, false) })),
+      ...secondary.lines.map((l) => ({ ...l, values: maskLine(l.values, true) })),
+    ];
+
+    // Only the active strategy's band should be shown per region.
+    const band = primary.band
+      ? {
+          upper: primary.band.upper.map((v, i) => (below(i) ? null : v)),
+          lower: primary.band.lower.map((v, i) => (below(i) ? null : v)),
+        }
+      : null;
+
+    const legend = [
+      ...primary.legend,
+      ...secondary.legend.map((l) => ({ ...l, label: `↓ ${l.label}` })),
+    ];
+
+    return { lines, signals, band, legend, threshold: switchThreshold as number };
+  }, [showAlgo, strategy, params, candles, switchEnabled, switchThreshold, switchStrategy]);
 
   const view = useMemo(() => {
+    if (candles.length === 0) return null;
     const W = 1000;
     const H = 520;
     const padRight = 64;
@@ -306,6 +383,11 @@ function SimulatedChart({
     if (algo?.band) {
       for (const u of algo.band.upper) if (u != null && u > max) max = u;
       for (const l of algo.band.lower) if (l != null && l < min) min = l;
+    }
+    // Keep the switch threshold line within view
+    if (algo?.threshold != null) {
+      if (algo.threshold > max) max = algo.threshold;
+      if (algo.threshold < min) min = algo.threshold;
     }
     const pad = (max - min) * 0.08 || max * 0.02;
     max += pad;
@@ -357,6 +439,7 @@ function SimulatedChart({
       color: l.color,
       width: l.width,
       dash: l.dash,
+      opacity: l.opacity,
     }));
 
     let bandUpperPath = "";
@@ -391,15 +474,41 @@ function SimulatedChart({
       };
     });
 
+    // Switch threshold line + shaded "fallback" zone below it
+    let thresholdY: number | null = null;
+    let thresholdLabel = "";
+    if (algo?.threshold != null) {
+      thresholdY = yPrice(algo.threshold);
+      thresholdLabel = algo.threshold.toFixed(decimals);
+    }
+    const priceBottom = padTop + priceH;
+
     return {
       W, H, padRight, padTop, priceH, volH, volGap, plotW, slot, bodyW,
       yPrice, yVol, gridLines, timeLabels, last, lastUp, decimals, min, max,
       overlayLines, bandUpperPath, bandLowerPath, bandArea, markers,
+      thresholdY, thresholdLabel, priceBottom,
     };
   }, [candles, timeframe, algo]);
 
   const up = "#22c55e";
   const down = "#ef4444";
+
+  // Before the client generates data (first paint / SSR), render an empty
+  // chart frame so server and client markup match and hydration is clean.
+  if (candles.length === 0 || !view) {
+    return (
+      <svg
+        viewBox="0 0 1000 520"
+        preserveAspectRatio="none"
+        width="100%"
+        height="100%"
+        role="img"
+        aria-label={ariaLabel}
+        style={{ display: "block" }}
+      />
+    );
+  }
 
   return (
     <svg
@@ -426,6 +535,46 @@ function SimulatedChart({
           </text>
         </g>
       ))}
+
+      {/* Switch threshold: shaded fallback zone below the threshold price */}
+      {view.thresholdY != null && (
+        <g>
+          <rect
+            x={0}
+            y={view.thresholdY}
+            width={view.plotW}
+            height={Math.max(view.priceBottom - view.thresholdY, 0)}
+            fill="rgba(239,68,68,0.08)"
+          />
+          <line
+            x1={0}
+            y1={view.thresholdY}
+            x2={view.plotW}
+            y2={view.thresholdY}
+            stroke="#ef4444"
+            strokeWidth={1.5}
+            strokeDasharray="6 4"
+            opacity={0.85}
+          />
+          <rect
+            x={view.W - view.padRight}
+            y={view.thresholdY - 9}
+            width={view.padRight}
+            height={18}
+            fill="#ef4444"
+          />
+          <text
+            x={view.W - view.padRight + 8}
+            y={view.thresholdY + 3}
+            fill="#0a0e17"
+            fontSize={11}
+            fontWeight={700}
+            fontFamily="monospace"
+          >
+            {view.thresholdLabel}
+          </text>
+        </g>
+      )}
 
       {/* Bollinger band area + edges (drawn behind candles) */}
       {view.bandArea && <path d={view.bandArea} fill="rgba(56,189,248,0.07)" stroke="none" />}
@@ -461,6 +610,7 @@ function SimulatedChart({
           stroke={l.color}
           strokeWidth={l.width}
           strokeDasharray={l.dash}
+          strokeOpacity={l.opacity ?? 1}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
