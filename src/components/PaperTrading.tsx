@@ -7,7 +7,7 @@ import SimulatedChart, { type Candle } from "@/components/SimulatedChart";
 import TickerSearch from "@/components/TickerSearch";
 import EodReview, { type EodPayload } from "@/components/EodReview";
 import { fetchKlines, fetchTicker, fetchSpotTickers, type CryptoMarket } from "@/lib/bybit";
-import { evaluateSignal, type StrategyId, type StrategyParams } from "@/lib/strategy";
+import { evaluateStance, type StrategyId, type StrategyParams } from "@/lib/strategy";
 import {
   getPaperState,
   executeTrade,
@@ -43,6 +43,37 @@ const defaultParams: Record<StrategyId, StrategyParams> = {
   rsi: { period: 14, oversold: 30, overbought: 70, stopLoss: 3, takeProfit: 6 },
   bollinger: { period: 20, stdDev: 2, stopLoss: 3, takeProfit: 6 },
   macd: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, stopLoss: 3, takeProfit: 6 },
+};
+
+// Tunable indicator inputs per strategy, rendered as sliders in the engine card.
+interface ParamControl {
+  key: keyof StrategyParams;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  suffix?: string;
+}
+
+const strategyParamControls: Record<StrategyId, ParamControl[]> = {
+  sma_crossover: [
+    { key: "fastPeriod", label: "Fast MA period", min: 2, max: 50, step: 1 },
+    { key: "slowPeriod", label: "Slow MA period", min: 5, max: 120, step: 1 },
+  ],
+  rsi: [
+    { key: "period", label: "RSI period", min: 2, max: 50, step: 1 },
+    { key: "oversold", label: "Oversold level", min: 5, max: 45, step: 1 },
+    { key: "overbought", label: "Overbought level", min: 55, max: 95, step: 1 },
+  ],
+  bollinger: [
+    { key: "period", label: "Period", min: 5, max: 60, step: 1 },
+    { key: "stdDev", label: "Std deviations", min: 1, max: 4, step: 0.1, suffix: "σ" },
+  ],
+  macd: [
+    { key: "fastPeriod", label: "Fast EMA", min: 2, max: 30, step: 1 },
+    { key: "slowPeriod", label: "Slow EMA", min: 10, max: 60, step: 1 },
+    { key: "signalPeriod", label: "Signal EMA", min: 2, max: 20, step: 1 },
+  ],
 };
 
 const DEFAULTS: Record<Market, Instrument> = {
@@ -339,17 +370,19 @@ export default function PaperTrading() {
           }
         }
 
-        const signal = evaluateSignal(closes, strategy, p);
-        if (signal === "BUY" && (!pos || pos.qty <= 0)) {
+        const stance = evaluateStance(closes, strategy, p);
+        if (stance === "LONG" && (!pos || pos.qty <= 0)) {
           const budget = cash * (allocation / 100);
           const qty = market === "crypto" ? +(budget / livePrice).toFixed(6) : Math.floor(budget / livePrice);
           if (qty > 0) {
-            const ok = await runTrade("BUY", qty, "strategy", "Signal BUY");
-            if (ok) pushLog(`BUY signal — opened ${qty} ${instrument.symbol}`);
+            const ok = await runTrade("BUY", qty, "strategy", `${strategyLabels[strategy]} entry`);
+            if (ok) pushLog(`${strategyLabels[strategy]} → LONG — opened ${qty} ${instrument.symbol}`);
+          } else {
+            pushLog(`LONG signal but insufficient cash for an entry.`);
           }
-        } else if (signal === "SELL" && pos && pos.qty > 0) {
-          const ok = await runTrade("SELL", pos.qty, "strategy", "Signal SELL");
-          if (ok) pushLog(`SELL signal — closed ${instrument.symbol}`);
+        } else if (stance === "FLAT" && pos && pos.qty > 0) {
+          const ok = await runTrade("SELL", pos.qty, "strategy", `${strategyLabels[strategy]} exit`);
+          if (ok) pushLog(`${strategyLabels[strategy]} → FLAT — closed ${instrument.symbol}`);
         }
       } finally {
         engineBusyRef.current = false;
@@ -753,6 +786,31 @@ export default function PaperTrading() {
                 ))}
               </select>
 
+              {/* Strategy-specific indicator inputs */}
+              {strategyParamControls[strategy].map((ctrl) => {
+                const raw = (curParams as Record<string, number | undefined>)[ctrl.key];
+                const value = raw ?? ctrl.min;
+                const display = ctrl.step < 1 ? value.toFixed(1) : Math.round(value);
+                return (
+                  <div key={ctrl.key as string}>
+                    <div className={styles.paramRow}>
+                      <label>{ctrl.label}</label>
+                      <span className="mono">{display}{ctrl.suffix ?? ""}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={ctrl.min}
+                      max={ctrl.max}
+                      step={ctrl.step}
+                      className="slider"
+                      value={value}
+                      onChange={(e) => updateParam(ctrl.key, +e.target.value)}
+                      disabled={engineOn}
+                    />
+                  </div>
+                );
+              })}
+
               <div className={styles.paramRow}>
                 <label>Allocation per entry</label>
                 <span className="mono">{allocation}%</span>
@@ -788,8 +846,8 @@ export default function PaperTrading() {
 
               <p className={styles.engineHint}>
                 {engineOn
-                  ? "Engine is live — evaluating signals on each price update while this page is open."
-                  : "Turn on to auto-execute the selected strategy with live prices."}
+                  ? `Engine is live — ${strategyLabels[strategy]} is evaluating ${instrument.symbol} on every price update and will open or close positions automatically.`
+                  : "Tune the indicator inputs above, then turn on to auto-trade the selected strategy with live prices. Controls lock while the engine runs."}
               </p>
 
               {engineLog.length > 0 && (

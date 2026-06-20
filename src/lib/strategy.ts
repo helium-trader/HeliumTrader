@@ -142,6 +142,89 @@ export function computeSignalSeries(
   return out;
 }
 
+// Live trading stance for the auto-engine.
+//
+// Unlike `evaluateSignal` (which only fires on a crossover that lands exactly on
+// the final bar), this returns the strategy's *desired regime* from the current
+// indicator state:
+//   - "LONG" → the engine should hold a position
+//   - "FLAT" → the engine should be out of the market
+//   - "HOLD" → no strong opinion; keep whatever position is currently open
+//
+// This makes the engine responsive in live paper trading, where only the last
+// candle moves: turning it on takes a position immediately when conditions are
+// met, and it flips in/out as the live price pushes indicators across their
+// thresholds. Trend strategies (SMA/MACD) always return LONG or FLAT; the
+// mean-reversion strategies (RSI/Bollinger) use HOLD between their bands so the
+// open position acts as the state.
+export function evaluateStance(
+  closes: number[],
+  strategy: StrategyId,
+  params: StrategyParams = {}
+): "LONG" | "FLAT" | "HOLD" {
+  const n = closes.length;
+  if (n < 3) return "HOLD";
+  const i = n - 1;
+
+  if (strategy === "sma_crossover") {
+    const fastP = (params.fastPeriod ?? 9) | 0;
+    const slowP = (params.slowPeriod ?? 21) | 0;
+    const fast = sma(closes, fastP);
+    const slow = sma(closes, slowP);
+    const f = fast[i];
+    const s = slow[i];
+    if (f == null || s == null) return "HOLD";
+    return f > s ? "LONG" : "FLAT";
+  }
+
+  if (strategy === "macd") {
+    const fastP = (params.fastPeriod ?? 12) | 0;
+    const slowP = (params.slowPeriod ?? 26) | 0;
+    const signalP = (params.signalPeriod ?? 9) | 0;
+    const fast = ema(closes, fastP);
+    const slow = ema(closes, slowP);
+    const macdLine = closes.map((_, idx) => {
+      const f = fast[idx];
+      const s = slow[idx];
+      return f != null && s != null ? f - s : 0;
+    });
+    const signal = ema(macdLine, signalP);
+    const m = macdLine[i];
+    const sg = signal[i];
+    if (sg == null) return "HOLD";
+    return m > sg ? "LONG" : "FLAT";
+  }
+
+  if (strategy === "rsi") {
+    const period = (params.period ?? 14) | 0;
+    const oversold = params.oversold ?? 30;
+    const overbought = params.overbought ?? 70;
+    const r = rsiSeries(closes, period);
+    const cur = r[i];
+    if (cur == null) return "HOLD";
+    if (cur <= oversold) return "LONG";
+    if (cur >= overbought) return "FLAT";
+    return "HOLD";
+  }
+
+  if (strategy === "bollinger") {
+    const period = (params.period ?? 20) | 0;
+    const mult = params.stdDev ?? 2;
+    const mid = sma(closes, period);
+    const std = rollingStd(closes, mid, period);
+    const m = mid[i];
+    const d = std[i];
+    if (m == null || d == null) return "HOLD";
+    const lower = m - mult * d;
+    const upper = m + mult * d;
+    if (closes[i] < lower) return "LONG";
+    if (closes[i] > upper) return "FLAT";
+    return "HOLD";
+  }
+
+  return "HOLD";
+}
+
 // Evaluate the signal at the most recent candle (cross detected on last bar).
 export function evaluateSignal(
   closes: number[],
