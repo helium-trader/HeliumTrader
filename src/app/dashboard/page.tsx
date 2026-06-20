@@ -958,7 +958,15 @@ export default function DashboardPage() {
                       <select
                         className={styles.strategySelect}
                         value={strategy}
-                        onChange={(e) => setStrategy(e.target.value as Strategy)}
+                        onChange={(e) => {
+                          const next = e.target.value as Strategy;
+                          setStrategy(next);
+                          // Keep the fallback strategy distinct from the primary
+                          if (switchStrategy === next) {
+                            const alt = (Object.keys(strategyLabels) as Strategy[]).find((k) => k !== next);
+                            if (alt) setSwitchStrategy(alt);
+                          }
+                        }}
                       >
                         {Object.entries(strategyLabels).map(([key, label]) => (
                           <option key={key} value={key}>{label}</option>
@@ -966,6 +974,59 @@ export default function DashboardPage() {
                       </select>
                       <p className={styles.strategyDesc}>{strategyDescriptions[strategy]}</p>
                     </div>
+
+                    <div className={styles.paramDivider} />
+
+                    {/* Strategy Switcher */}
+                    <div className={styles.paramGroup}>
+                      <label className={styles.switchRow}>
+                        <span className={styles.paramLabel} style={{ margin: 0 }}>Strategy Switcher</span>
+                        <input
+                          type="checkbox"
+                          className={styles.switchToggle}
+                          checked={switchEnabled}
+                          onChange={(e) => setSwitchEnabled(e.target.checked)}
+                        />
+                      </label>
+                      <p className={styles.strategyDesc}>
+                        Swap to a fallback strategy when price drops below a set threshold.
+                      </p>
+                    </div>
+
+                    {switchEnabled && (
+                      <>
+                        <div className={styles.paramGroup}>
+                          <label className={styles.paramLabel} htmlFor="liveSwitchThreshold">
+                            Threshold Price
+                          </label>
+                          <input
+                            id="liveSwitchThreshold"
+                            type="number"
+                            step="0.01"
+                            className={styles.tickerInput}
+                            value={switchThreshold}
+                            onChange={(e) => setSwitchThreshold(+e.target.value)}
+                          />
+                        </div>
+                        <div className={styles.paramGroup}>
+                          <label className={styles.paramLabel}>Fallback Strategy</label>
+                          <select
+                            className={styles.strategySelect}
+                            value={switchStrategy}
+                            onChange={(e) => setSwitchStrategy(e.target.value as Strategy)}
+                          >
+                            {Object.entries(strategyLabels)
+                              .filter(([key]) => key !== strategy)
+                              .map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                              ))}
+                          </select>
+                          <p className={styles.strategyDesc}>
+                            Below {switchThreshold}, the chart uses {strategyLabels[switchStrategy]} instead of {strategyLabels[strategy]}.
+                          </p>
+                        </div>
+                      </>
+                    )}
 
                     <button
                       className="btn btn-primary"
